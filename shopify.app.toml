@@ -1,0 +1,36 @@
+# StellarPOD Shopify App Configuration
+
+name = "StellarPOD"
+client_id = "your-client-id-here"
+
+[access_scopes]
+scopes = "read_products,write_products,read_orders,write_orders"
+
+[auth]
+redirect_urls = [
+  "https://your-app-url.ngrok.io/auth/callback",
+  "https://your-app-url.ngrok.io/auth/shopify/callback",
+]
+
+[webhooks]
+api_version = "2024-10"
+
+  [webhooks.subscriptions.orders-create]
+  uri = "/webhooks/orders/create"
+  topics = ["orders/create"]
+
+  [webhooks.subscriptions.orders-updated]
+  uri = "/webhooks/orders/updated"
+  topics = ["orders/updated"]
+
+[app_proxy]
+url = "https://your-app-url.ngrok.io"
+subpath = "stellarpod"
+prefix = "apps"
+
+[pos]
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = true
+dev_store_url = "your-dev-store.myshopify.com"

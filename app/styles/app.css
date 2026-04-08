@@ -1,0 +1,29 @@
+/* StellarPOD App - Global Styles */
+/* Polaris handles most styling. These are minimal overrides and utilities. */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI",
+    Roboto, "Helvetica Neue", sans-serif;
+  background-color: #f6f6f7;
+}
+
+/* Ensure the app fills the viewport within Shopify admin */
+#root {
+  min-height: 100vh;
+}
+
+/* Utility for page-level spacing inside Shopify admin iframe */
+.stellarpod-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* Image thumbnails in design cards */
+img {
+  max-width: 100%;
+  height: auto;
+}
