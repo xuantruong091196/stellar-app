@@ -1,32 +1,54 @@
-import { Page, Layout, Card, DataTable, Badge, Text, BlockStack, InlineStack, InlineGrid, Box } from "@shopify/polaris";
+import { Page, Layout, Card, DataTable, Badge, Text, BlockStack, InlineStack, InlineGrid, Box, Banner, Spinner } from "@shopify/polaris";
 import type { MetaFunction } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
+import { apiGet } from "~/lib/api";
+import type { Order, Escrow, PaginatedResponse, OrderStatus, EscrowStatus } from "~/lib/types";
+import { ORDER_STATUS_LABELS, ESCROW_STATUS_LABELS } from "~/lib/types";
 
 export const meta: MetaFunction = () => {
   return [{ title: "StellarPOD - Dashboard" }];
 };
 
-// TODO: Replace with real data from loader
-const orderSummary = {
-  pending: 12,
-  inProduction: 8,
-  shipped: 45,
-};
+const STORE_ID = "demo-store";
 
-const recentEscrows = [
-  ["ESC-001", "Order #1042", "$24.99", "Locked", "2026-04-07"],
-  ["ESC-002", "Order #1038", "$18.50", "Released", "2026-04-06"],
-  ["ESC-003", "Order #1035", "$32.00", "Locked", "2026-04-05"],
-  ["ESC-004", "Order #1030", "$15.75", "Disputed", "2026-04-04"],
-  ["ESC-005", "Order #1028", "$42.00", "Released", "2026-04-03"],
-];
+export async function loader() {
+  const [ordersRes, escrowsRes] = await Promise.all([
+    apiGet<PaginatedResponse<Order>>(`/orders/${STORE_ID}?limit=5`),
+    apiGet<PaginatedResponse<Escrow>>(`/escrow/store/${STORE_ID}?limit=5`),
+  ]);
+
+  // Compute order summary from orders data
+  const orders = ordersRes.data?.data ?? [];
+  const orderSummary = {
+    pending: orders.filter((o) => o.status === "PENDING" || o.status === "ESCROW_LOCKED").length,
+    inProduction: orders.filter((o) => o.status === "IN_PRODUCTION" || o.status === "SENT_TO_PROVIDER").length,
+    shipped: orders.filter((o) => o.status === "SHIPPED" || o.status === "DELIVERED").length,
+  };
+
+  const totalOrders = ordersRes.data?.meta?.total ?? 0;
+
+  return json({
+    orders,
+    escrows: escrowsRes.data?.data ?? [],
+    orderSummary,
+    totalOrders,
+    error: ordersRes.error || escrowsRes.error || null,
+  });
+}
 
 function StatusBadge({ status }: { status: string }) {
   const toneMap: Record<string, "warning" | "success" | "critical" | "info"> = {
-    Locked: "warning",
-    Released: "success",
-    Disputed: "critical",
+    LOCKING: "info",
+    LOCKED: "warning",
+    RELEASING: "info",
+    RELEASED: "success",
+    DISPUTED: "critical",
+    REFUNDED: "info",
+    EXPIRED: "warning",
   };
-  return <Badge tone={toneMap[status] || "info"}>{status}</Badge>;
+  const label = ESCROW_STATUS_LABELS[status as EscrowStatus] || status;
+  return <Badge tone={toneMap[status] || "info"}>{label}</Badge>;
 }
 
 function SummaryCard({ title, count, status }: { title: string; count: number; status: string }) {
@@ -42,17 +64,25 @@ function SummaryCard({ title, count, status }: { title: string; count: number; s
 }
 
 export default function Dashboard() {
-  const escrowRows = recentEscrows.map(([id, order, amount, status, date]) => [
-    id,
-    order,
-    amount,
-    <StatusBadge key={id} status={status} />,
-    date,
+  const { escrows, orderSummary, totalOrders, error } = useLoaderData<typeof loader>();
+
+  const escrowRows = escrows.map((escrow) => [
+    escrow.id,
+    escrow.orderId,
+    `$${escrow.amountUsdc.toFixed(2)}`,
+    <StatusBadge key={escrow.id} status={escrow.status} />,
+    new Date(escrow.createdAt).toLocaleDateString(),
   ]);
 
   return (
     <Page title="StellarPOD Dashboard">
       <BlockStack gap="500">
+        {error && (
+          <Banner title="Error loading data" tone="critical">
+            <p>{error}</p>
+          </Banner>
+        )}
+
         <InlineGrid columns={3} gap="400">
           <SummaryCard title="Pending" count={orderSummary.pending} status="warning" />
           <SummaryCard title="In Production" count={orderSummary.inProduction} status="info" />
@@ -64,11 +94,15 @@ export default function Dashboard() {
             <Card>
               <BlockStack gap="300">
                 <Text as="h2" variant="headingMd">Recent Escrows</Text>
-                <DataTable
-                  columnContentTypes={["text", "text", "numeric", "text", "text"]}
-                  headings={["Escrow ID", "Order", "Amount", "Status", "Date"]}
-                  rows={escrowRows}
-                />
+                {escrowRows.length > 0 ? (
+                  <DataTable
+                    columnContentTypes={["text", "text", "numeric", "text", "text"]}
+                    headings={["Escrow ID", "Order", "Amount", "Status", "Date"]}
+                    rows={escrowRows}
+                  />
+                ) : (
+                  <Text as="p" variant="bodySm" tone="subdued">No escrows found.</Text>
+                )}
               </BlockStack>
             </Card>
           </Layout.Section>
@@ -96,15 +130,15 @@ export default function Dashboard() {
                   <BlockStack gap="200">
                     <InlineStack align="space-between">
                       <Text as="span" variant="bodyMd">Total Orders</Text>
-                      <Text as="span" variant="bodyMd" fontWeight="bold">65</Text>
+                      <Text as="span" variant="bodyMd" fontWeight="bold">{totalOrders}</Text>
                     </InlineStack>
                     <InlineStack align="space-between">
                       <Text as="span" variant="bodyMd">Active Designs</Text>
-                      <Text as="span" variant="bodyMd" fontWeight="bold">23</Text>
+                      <Text as="span" variant="bodyMd" fontWeight="bold">—</Text>
                     </InlineStack>
                     <InlineStack align="space-between">
                       <Text as="span" variant="bodyMd">Connected Providers</Text>
-                      <Text as="span" variant="bodyMd" fontWeight="bold">4</Text>
+                      <Text as="span" variant="bodyMd" fontWeight="bold">—</Text>
                     </InlineStack>
                   </BlockStack>
                 </BlockStack>

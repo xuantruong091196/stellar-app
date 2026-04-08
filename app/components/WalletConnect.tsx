@@ -9,7 +9,11 @@ interface WalletState {
   error: string | null;
 }
 
-export function WalletConnect() {
+interface WalletConnectProps {
+  onAddressChange?: (address: string | null) => void;
+}
+
+export function WalletConnect({ onAddressChange }: WalletConnectProps = {}) {
   const [wallet, setWallet] = useState<WalletState>({
     connected: false,
     address: null,
@@ -34,6 +38,7 @@ export function WalletConnect() {
         loading: false,
         error: null,
       });
+      onAddressChange?.(walletInfo.address);
     } catch (err) {
       setWallet((prev) => ({
         ...prev,
@@ -51,7 +56,8 @@ export function WalletConnect() {
       loading: false,
       error: null,
     });
-  }, []);
+    onAddressChange?.(null);
+  }, [onAddressChange]);
 
   const truncateAddress = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-6)}`;

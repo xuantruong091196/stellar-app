@@ -1,6 +1,6 @@
 import {
   isConnected,
-  getAddress,
+  getPublicKey,
   signTransaction,
   setAllowed,
 } from "@stellar/freighter-api";
@@ -12,66 +12,56 @@ export interface WalletInfo {
 
 /**
  * Connect to the Freighter wallet extension.
- * Returns the public address of the connected wallet.
  */
 export async function connectWallet(): Promise<WalletInfo> {
   const connected = await isConnected();
-  if (!connected.isConnected) {
+  if (!connected) {
     throw new Error(
       "Freighter wallet extension is not installed. Please install it from https://freighter.app"
     );
   }
 
   await setAllowed();
+  const address = await getPublicKey();
 
-  const addressResult = await getAddress();
-  if (addressResult.error) {
-    throw new Error(`Failed to get wallet address: ${addressResult.error}`);
+  if (!address) {
+    throw new Error("Failed to get wallet address");
   }
 
-  return {
-    address: addressResult.address,
-    connected: true,
-  };
+  return { address, connected: true };
 }
 
 /**
  * Sign a Stellar transaction XDR using Freighter.
- * @param xdr - The transaction XDR string to sign
- * @returns The signed XDR string
  */
 export async function signTransactionXdr(xdr: string): Promise<string> {
-  const result = await signTransaction(xdr, {
+  const signed = await signTransaction(xdr, {
     networkPassphrase: "Test SDF Network ; September 2015",
   });
 
-  if (result.error) {
-    throw new Error(`Failed to sign transaction: ${result.error}`);
+  if (!signed) {
+    throw new Error("Failed to sign transaction");
   }
 
-  return result.signedTxXdr;
+  return signed;
 }
 
 /**
- * Get the USDC balance for a Stellar address.
- * Calls the StellarPOD API which queries the Stellar network.
- * @param address - The Stellar public key
- * @returns The USDC balance as a string
+ * Get the USDC balance for a Stellar address via stellarpod-api.
  */
 export async function getBalance(address: string): Promise<string> {
-  // TODO: Replace with actual API call to stellarpod-api
-  // The API wraps Stellar Horizon to fetch the USDC trustline balance
   try {
-    const response = await fetch(
-      `${import.meta.env.VITE_STELLARPOD_API_URL || "http://localhost:8000"}/api/v1/wallet/${address}/balance`
-    );
+    const apiUrl = typeof process !== "undefined"
+      ? process.env.STELLARPOD_API_URL || "http://localhost:3000"
+      : "http://localhost:3000";
+
+    const response = await fetch(`${apiUrl}/stellar/balance/${address}`);
     if (!response.ok) {
-      throw new Error("Failed to fetch balance");
+      return "0.00";
     }
-    const data = (await response.json()) as { usdc_balance: string };
-    return data.usdc_balance || "0.00";
+    const data = (await response.json()) as { balance: number };
+    return String(data.balance ?? "0.00");
   } catch {
-    console.error("Failed to fetch wallet balance");
     return "0.00";
   }
 }
@@ -81,8 +71,7 @@ export async function getBalance(address: string): Promise<string> {
  */
 export async function isWalletAvailable(): Promise<boolean> {
   try {
-    const result = await isConnected();
-    return result.isConnected;
+    return await isConnected();
   } catch {
     return false;
   }

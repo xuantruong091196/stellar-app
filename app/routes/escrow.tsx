@@ -9,36 +9,101 @@ import {
   InlineGrid,
   Text,
   Box,
+  Button,
+  Banner,
 } from "@shopify/polaris";
-import type { MetaFunction } from "@remix-run/node";
+import type { MetaFunction, LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { useLoaderData, useFetcher } from "@remix-run/react";
 import { EscrowStatusBadge } from "~/components/EscrowStatusBadge";
+import { apiGet, apiPost } from "~/lib/api";
+import type { Escrow, PaginatedResponse, EscrowStatus } from "~/lib/types";
 
 export const meta: MetaFunction = () => {
   return [{ title: "StellarPOD - Escrow" }];
 };
 
-// TODO: Replace with loader data from API
-const escrowSummary = {
-  totalLocked: "$245.50",
-  totalReleased: "$1,230.00",
-  totalDisputed: "$32.00",
-  activeCount: 5,
-};
+const STORE_ID = "demo-store";
 
-const activeEscrows = [
-  { id: "ESC-010", orderId: "ORD-1042", provider: "PrintMaster Co.", amount: "$64.97", status: "locked" as const, lockedAt: "2026-04-07", expiresAt: "2026-04-21" },
-  { id: "ESC-009", orderId: "ORD-1041", amount: "$24.99", provider: "EuroPrint GmbH", status: "locked" as const, lockedAt: "2026-04-07", expiresAt: "2026-04-21" },
-  { id: "ESC-008", orderId: "ORD-1040", amount: "$49.98", provider: "PrintMaster Co.", status: "locked" as const, lockedAt: "2026-04-06", expiresAt: "2026-04-20" },
-  { id: "ESC-007", orderId: "ORD-1038", amount: "$32.00", provider: "AsiaFab Ltd", status: "disputed" as const, lockedAt: "2026-04-04", expiresAt: "2026-04-18" },
-  { id: "ESC-006", orderId: "ORD-1036", amount: "$73.56", provider: "NordicCraft AB", status: "locked" as const, lockedAt: "2026-04-03", expiresAt: "2026-04-17" },
-];
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const page = parseInt(url.searchParams.get("page") || "1", 10);
 
-const releaseHistory = [
-  { id: "ESC-005", orderId: "ORD-1035", provider: "PrintMaster Co.", amount: "$42.00", releasedAt: "2026-04-03" },
-  { id: "ESC-004", orderId: "ORD-1032", provider: "EuroPrint GmbH", amount: "$88.50", releasedAt: "2026-04-01" },
-  { id: "ESC-003", orderId: "ORD-1028", provider: "AsiaFab Ltd", amount: "$120.00", releasedAt: "2026-03-28" },
-  { id: "ESC-002", orderId: "ORD-1025", provider: "PrintMaster Co.", amount: "$55.00", releasedAt: "2026-03-25" },
-];
+  const result = await apiGet<PaginatedResponse<Escrow>>(
+    `/escrow/store/${STORE_ID}?page=${page}&limit=20`
+  );
+
+  if (result.error || !result.data) {
+    return json({
+      escrows: [] as Escrow[],
+      meta: { total: 0, page: 1, limit: 20, totalPages: 0 },
+      summary: { totalLocked: 0, totalReleased: 0, totalDisputed: 0, activeCount: 0 },
+      error: result.error || "Failed to load escrows",
+    });
+  }
+
+  const allEscrows = result.data.data;
+
+  // Compute summary stats from loaded data
+  const summary = allEscrows.reduce(
+    (acc, escrow) => {
+      if (escrow.status === "LOCKED" || escrow.status === "LOCKING") {
+        acc.totalLocked += escrow.amountUsdc;
+        acc.activeCount += 1;
+      }
+      if (escrow.status === "RELEASED" || escrow.status === "RELEASING") {
+        acc.totalReleased += escrow.amountUsdc;
+      }
+      if (escrow.status === "DISPUTED") {
+        acc.totalDisputed += escrow.amountUsdc;
+        acc.activeCount += 1;
+      }
+      return acc;
+    },
+    { totalLocked: 0, totalReleased: 0, totalDisputed: 0, activeCount: 0 }
+  );
+
+  return json({
+    escrows: allEscrows,
+    meta: result.data.meta,
+    summary,
+    error: null,
+  });
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent === "release") {
+    const escrowId = formData.get("escrowId") as string;
+    if (!escrowId) {
+      return json({ success: false, error: "Missing escrow ID" }, { status: 400 });
+    }
+
+    const result = await apiPost(`/escrow/${escrowId}/release`, {});
+    if (result.error) {
+      return json({ success: false, error: result.error }, { status: result.status || 500 });
+    }
+
+    return json({ success: true, error: null });
+  }
+
+  return json({ success: false, error: "Unknown intent" }, { status: 400 });
+}
+
+function formatUsd(amount: number): string {
+  return `$${amount.toFixed(2)}`;
+}
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "-";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 function SummaryCard({ title, value, tone }: { title: string; value: string; tone?: "success" | "warning" | "critical" }) {
   return (
@@ -52,37 +117,71 @@ function SummaryCard({ title, value, tone }: { title: string; value: string; ton
   );
 }
 
-export default function Escrow() {
+export default function EscrowDashboard() {
+  const { escrows, summary, error } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher();
+
+  const activeStatuses: EscrowStatus[] = ["LOCKED", "LOCKING", "DISPUTED"];
+  const historyStatuses: EscrowStatus[] = ["RELEASED", "RELEASING", "REFUNDED", "EXPIRED"];
+
+  const activeEscrows = escrows.filter((e) => activeStatuses.includes(e.status as EscrowStatus));
+  const historyEscrows = escrows.filter((e) => historyStatuses.includes(e.status as EscrowStatus));
+
+  const releaseInFlight = fetcher.state !== "idle";
+  const fetcherData = fetcher.data as { success: boolean; error: string | null } | undefined;
+  const releaseError = fetcherData && !fetcherData.success ? fetcherData.error : null;
+
   const activeRows = activeEscrows.map((escrow) => [
-    escrow.id,
-    escrow.orderId,
-    escrow.provider,
-    escrow.amount,
+    escrow.id.slice(0, 8),
+    escrow.orderId?.slice(0, 8) || "-",
+    escrow.providerId || "-",
+    formatUsd(escrow.amountUsdc),
     <EscrowStatusBadge key={escrow.id} status={escrow.status} />,
-    escrow.lockedAt,
-    escrow.expiresAt,
+    formatDate(escrow.lockedAt),
+    formatDate(escrow.expiresAt),
+    escrow.status === "LOCKED" ? (
+      <fetcher.Form method="post" key={`release-${escrow.id}`}>
+        <input type="hidden" name="intent" value="release" />
+        <input type="hidden" name="escrowId" value={escrow.id} />
+        <Button variant="plain" submit disabled={releaseInFlight} size="slim">
+          Release
+        </Button>
+      </fetcher.Form>
+    ) : null,
   ]);
 
-  const historyRows = releaseHistory.map((escrow) => [
-    escrow.id,
-    escrow.orderId,
-    escrow.provider,
-    escrow.amount,
-    <Badge key={escrow.id} tone="success">Released</Badge>,
-    escrow.releasedAt,
+  const historyRows = historyEscrows.map((escrow) => [
+    escrow.id.slice(0, 8),
+    escrow.orderId?.slice(0, 8) || "-",
+    escrow.providerId || "-",
+    formatUsd(escrow.amountUsdc),
+    <EscrowStatusBadge key={escrow.id} status={escrow.status} />,
+    formatDate(escrow.releasedAt),
   ]);
 
   return (
     <Page title="Escrow Dashboard" subtitle="Manage Stellar blockchain escrow payments">
       <BlockStack gap="500">
+        {error && (
+          <Banner title="Error loading escrows" tone="critical">
+            <p>{error}</p>
+          </Banner>
+        )}
+
+        {releaseError && (
+          <Banner title="Release failed" tone="critical">
+            <p>{releaseError}</p>
+          </Banner>
+        )}
+
         <InlineGrid columns={4} gap="400">
-          <SummaryCard title="Total Locked" value={escrowSummary.totalLocked} tone="warning" />
-          <SummaryCard title="Total Released" value={escrowSummary.totalReleased} tone="success" />
-          <SummaryCard title="Total Disputed" value={escrowSummary.totalDisputed} tone="critical" />
+          <SummaryCard title="Total Locked" value={formatUsd(summary.totalLocked)} tone="warning" />
+          <SummaryCard title="Total Released" value={formatUsd(summary.totalReleased)} tone="success" />
+          <SummaryCard title="Total Disputed" value={formatUsd(summary.totalDisputed)} tone="critical" />
           <Card>
             <BlockStack gap="200">
               <Text as="h3" variant="headingSm">Active Escrows</Text>
-              <Text as="p" variant="headingXl">{escrowSummary.activeCount}</Text>
+              <Text as="p" variant="headingXl">{summary.activeCount}</Text>
               <Badge tone="info">Active</Badge>
             </BlockStack>
           </Card>
@@ -94,11 +193,11 @@ export default function Escrow() {
               <BlockStack gap="300">
                 <InlineStack align="space-between">
                   <Text as="h2" variant="headingMd">Active Escrows</Text>
-                  <Badge tone="warning">{activeEscrows.length} active</Badge>
+                  <Badge tone="warning">{`${activeEscrows.length} active`}</Badge>
                 </InlineStack>
                 <DataTable
-                  columnContentTypes={["text", "text", "text", "numeric", "text", "text", "text"]}
-                  headings={["Escrow ID", "Order", "Provider", "Amount", "Status", "Locked", "Expires"]}
+                  columnContentTypes={["text", "text", "text", "numeric", "text", "text", "text", "text"]}
+                  headings={["Escrow ID", "Order", "Provider", "Amount", "Status", "Locked", "Expires", "Action"]}
                   rows={activeRows}
                 />
               </BlockStack>

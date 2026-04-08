@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import {
   Page,
   Card,
@@ -9,99 +9,139 @@ import {
   ChoiceList,
   BlockStack,
   Text,
+  Banner,
+  InlineStack,
 } from "@shopify/polaris";
-import type { MetaFunction } from "@remix-run/node";
-import { useNavigate } from "@remix-run/react";
+import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { useLoaderData, useNavigate, useSearchParams } from "@remix-run/react";
+import { apiGet } from "~/lib/api";
+import type { Order, PaginatedResponse, OrderStatus } from "~/lib/types";
+import { ORDER_STATUS_LABELS, ESCROW_STATUS_LABELS } from "~/lib/types";
 
 export const meta: MetaFunction = () => {
   return [{ title: "StellarPOD - Orders" }];
 };
 
-type OrderStatus = "pending" | "in_production" | "shipped" | "delivered" | "disputed";
+const STORE_ID = "demo-store";
 
-interface Order {
-  id: string;
-  shopifyOrderId: string;
-  customer: string;
-  items: number;
-  total: string;
-  status: OrderStatus;
-  escrowStatus: string;
-  date: string;
+const statusBadgeTone: Record<OrderStatus, "warning" | "info" | "success" | "critical" | "attention"> = {
+  PENDING: "warning",
+  ESCROW_LOCKED: "warning",
+  SENT_TO_PROVIDER: "info",
+  IN_PRODUCTION: "info",
+  SHIPPED: "success",
+  DELIVERED: "success",
+  ESCROW_RELEASED: "success",
+  DISPUTED: "critical",
+  CANCELLED: "critical",
+  REFUNDED: "attention",
+};
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const status = url.searchParams.get("status") || "";
+  const page = url.searchParams.get("page") || "1";
+  const query = url.searchParams.get("q") || "";
+
+  let endpoint = `/orders/${STORE_ID}?page=${page}&limit=20`;
+  if (status) {
+    endpoint += `&status=${status}`;
+  }
+
+  const res = await apiGet<PaginatedResponse<Order>>(endpoint);
+
+  return json({
+    orders: res.data?.data ?? [],
+    meta: res.data?.meta ?? { total: 0, page: 1, limit: 20, totalPages: 1 },
+    error: res.error,
+    query,
+  });
 }
-
-// TODO: Replace with loader data from API
-const mockOrders: Order[] = [
-  { id: "ORD-1042", shopifyOrderId: "#1042", customer: "John D.", items: 3, total: "$74.97", status: "pending", escrowStatus: "Locked", date: "2026-04-07" },
-  { id: "ORD-1041", shopifyOrderId: "#1041", customer: "Sarah M.", items: 1, total: "$24.99", status: "in_production", escrowStatus: "Locked", date: "2026-04-07" },
-  { id: "ORD-1040", shopifyOrderId: "#1040", customer: "Mike R.", items: 2, total: "$49.98", status: "shipped", escrowStatus: "Locked", date: "2026-04-06" },
-  { id: "ORD-1039", shopifyOrderId: "#1039", customer: "Emily K.", items: 1, total: "$18.50", status: "delivered", escrowStatus: "Released", date: "2026-04-05" },
-  { id: "ORD-1038", shopifyOrderId: "#1038", customer: "Tom W.", items: 4, total: "$99.96", status: "disputed", escrowStatus: "Disputed", date: "2026-04-04" },
-];
-
-const statusBadgeTone: Record<OrderStatus, "warning" | "info" | "success" | "complete" | "critical"> = {
-  pending: "warning",
-  in_production: "info",
-  shipped: "success",
-  delivered: "complete",
-  disputed: "critical",
-};
-
-const statusLabels: Record<OrderStatus, string> = {
-  pending: "Pending",
-  in_production: "In Production",
-  shipped: "Shipped",
-  delivered: "Delivered",
-  disputed: "Disputed",
-};
 
 export default function Orders() {
   const navigate = useNavigate();
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [queryValue, setQueryValue] = useState("");
+  const { orders, meta, error, query } = useLoaderData<typeof loader>();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const statusFilter = searchParams.get("status")?.split(",").filter(Boolean) ?? [];
+  const queryValue = searchParams.get("q") || "";
 
   const handleStatusChange = useCallback((value: string[]) => {
-    setStatusFilter(value);
-  }, []);
+    setSearchParams((prev) => {
+      if (value.length > 0) {
+        prev.set("status", value.join(","));
+      } else {
+        prev.delete("status");
+      }
+      prev.set("page", "1");
+      return prev;
+    });
+  }, [setSearchParams]);
 
   const handleQueryChange = useCallback((value: string) => {
-    setQueryValue(value);
-  }, []);
+    setSearchParams((prev) => {
+      if (value) {
+        prev.set("q", value);
+      } else {
+        prev.delete("q");
+      }
+      prev.set("page", "1");
+      return prev;
+    });
+  }, [setSearchParams]);
 
   const handleQueryClear = useCallback(() => {
-    setQueryValue("");
-  }, []);
+    setSearchParams((prev) => {
+      prev.delete("q");
+      prev.set("page", "1");
+      return prev;
+    });
+  }, [setSearchParams]);
 
   const handleFiltersClearAll = useCallback(() => {
-    setStatusFilter([]);
-    setQueryValue("");
-  }, []);
+    setSearchParams((prev) => {
+      prev.delete("status");
+      prev.delete("q");
+      prev.set("page", "1");
+      return prev;
+    });
+  }, [setSearchParams]);
 
-  const filteredOrders = mockOrders.filter((order) => {
-    if (statusFilter.length > 0 && !statusFilter.includes(order.status)) {
-      return false;
-    }
-    if (queryValue && !order.customer.toLowerCase().includes(queryValue.toLowerCase()) &&
-        !order.shopifyOrderId.includes(queryValue)) {
-      return false;
-    }
-    return true;
-  });
+  // Client-side query filtering (search by customer name or shopify order number)
+  const filteredOrders = queryValue
+    ? orders.filter((order) =>
+        order.customerName.toLowerCase().includes(queryValue.toLowerCase()) ||
+        order.shopifyOrderNumber.includes(queryValue)
+      )
+    : orders;
 
   const rows = filteredOrders.map((order) => [
     <Button key={order.id} variant="plain" onClick={() => navigate(`/orders/${order.id}`)}>
-      {order.shopifyOrderId}
+      {`#${order.shopifyOrderNumber}`}
     </Button>,
-    order.customer,
-    order.items,
-    order.total,
-    <Badge key={`status-${order.id}`} tone={statusBadgeTone[order.status]}>
-      {statusLabels[order.status]}
+    order.customerName,
+    order.items?.length ?? 0,
+    `$${order.totalUsdc.toFixed(2)}`,
+    <Badge key={`status-${order.id}`} tone={statusBadgeTone[order.status] || "info"}>
+      {ORDER_STATUS_LABELS[order.status] || order.status}
     </Badge>,
-    <Badge key={`escrow-${order.id}`} tone={order.escrowStatus === "Locked" ? "warning" : order.escrowStatus === "Released" ? "success" : "critical"}>
-      {order.escrowStatus}
-    </Badge>,
-    order.date,
+    order.escrow ? (
+      <Badge
+        key={`escrow-${order.id}`}
+        tone={
+          order.escrow.status === "LOCKED" ? "warning"
+          : order.escrow.status === "RELEASED" ? "success"
+          : order.escrow.status === "DISPUTED" ? "critical"
+          : "info"
+        }
+      >
+        {ESCROW_STATUS_LABELS[order.escrow.status] || order.escrow.status}
+      </Badge>
+    ) : (
+      <Badge key={`escrow-${order.id}`} tone="info">N/A</Badge>
+    ),
+    new Date(order.createdAt).toLocaleDateString(),
   ]);
 
   const filters = [
@@ -112,13 +152,10 @@ export default function Orders() {
         <ChoiceList
           title="Order Status"
           titleHidden
-          choices={[
-            { label: "Pending", value: "pending" },
-            { label: "In Production", value: "in_production" },
-            { label: "Shipped", value: "shipped" },
-            { label: "Delivered", value: "delivered" },
-            { label: "Disputed", value: "disputed" },
-          ]}
+          choices={Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => ({
+            label,
+            value,
+          }))}
           selected={statusFilter}
           onChange={handleStatusChange}
           allowMultiple
@@ -131,36 +168,74 @@ export default function Orders() {
   const appliedFilters = statusFilter.length > 0
     ? [{
         key: "status",
-        label: `Status: ${statusFilter.map((s) => statusLabels[s as OrderStatus]).join(", ")}`,
-        onRemove: () => setStatusFilter([]),
+        label: `Status: ${statusFilter.map((s) => ORDER_STATUS_LABELS[s as OrderStatus] || s).join(", ")}`,
+        onRemove: () => handleStatusChange([]),
       }]
     : [];
 
   return (
     <Page title="Orders" subtitle="Manage your print-on-demand orders">
-      <Card>
-        <BlockStack gap="300">
-          <Filters
-            queryValue={queryValue}
-            queryPlaceholder="Search by customer or order ID..."
-            filters={filters}
-            appliedFilters={appliedFilters}
-            onQueryChange={handleQueryChange}
-            onQueryClear={handleQueryClear}
-            onClearAll={handleFiltersClearAll}
-          />
-          <DataTable
-            columnContentTypes={["text", "text", "numeric", "numeric", "text", "text", "text"]}
-            headings={["Order", "Customer", "Items", "Total", "Status", "Escrow", "Date"]}
-            rows={rows}
-            footerContent={
-              <Text as="span" variant="bodySm" tone="subdued">
-                Showing {filteredOrders.length} of {mockOrders.length} orders
-              </Text>
-            }
-          />
-        </BlockStack>
-      </Card>
+      <BlockStack gap="400">
+        {error && (
+          <Banner title="Error loading orders" tone="critical">
+            <p>{error}</p>
+          </Banner>
+        )}
+
+        <Card>
+          <BlockStack gap="300">
+            <Filters
+              queryValue={queryValue}
+              queryPlaceholder="Search by customer or order ID..."
+              filters={filters}
+              appliedFilters={appliedFilters}
+              onQueryChange={handleQueryChange}
+              onQueryClear={handleQueryClear}
+              onClearAll={handleFiltersClearAll}
+            />
+            <DataTable
+              columnContentTypes={["text", "text", "numeric", "numeric", "text", "text", "text"]}
+              headings={["Order", "Customer", "Items", "Total", "Status", "Escrow", "Date"]}
+              rows={rows}
+              footerContent={
+                <InlineStack align="space-between">
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Showing {filteredOrders.length} of {meta.total} orders — Page {meta.page} of {meta.totalPages}
+                  </Text>
+                  <InlineStack gap="200">
+                    {meta.page > 1 && (
+                      <Button
+                        size="slim"
+                        onClick={() =>
+                          setSearchParams((prev) => {
+                            prev.set("page", String(meta.page - 1));
+                            return prev;
+                          })
+                        }
+                      >
+                        Previous
+                      </Button>
+                    )}
+                    {meta.page < meta.totalPages && (
+                      <Button
+                        size="slim"
+                        onClick={() =>
+                          setSearchParams((prev) => {
+                            prev.set("page", String(meta.page + 1));
+                            return prev;
+                          })
+                        }
+                      >
+                        Next
+                      </Button>
+                    )}
+                  </InlineStack>
+                </InlineStack>
+              }
+            />
+          </BlockStack>
+        </Card>
+      </BlockStack>
     </Page>
   );
 }

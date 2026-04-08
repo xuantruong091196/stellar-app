@@ -2,69 +2,87 @@ import {
   Page,
   Layout,
   Card,
-  Button,
   BlockStack,
   InlineGrid,
   Text,
   EmptyState,
+  Banner,
 } from "@shopify/polaris";
-import type { MetaFunction } from "@remix-run/node";
-import { useNavigate } from "@remix-run/react";
+import type { MetaFunction, LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { useLoaderData, useNavigate, useFetcher } from "@remix-run/react";
 import { DesignCard } from "~/components/DesignCard";
+import { apiGet, apiDelete } from "~/lib/api";
+import type { Design, PaginatedResponse } from "~/lib/types";
 
 export const meta: MetaFunction = () => {
   return [{ title: "StellarPOD - Designs" }];
 };
 
-interface Design {
-  id: string;
-  name: string;
-  thumbnailUrl: string;
-  copyrightStatus: "pending" | "registered" | "rejected";
-  createdAt: string;
-  productCount: number;
+const STORE_ID = "demo-store";
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const page = url.searchParams.get("page") || "1";
+
+  const result = await apiGet<PaginatedResponse<Design>>(
+    `/designs/${STORE_ID}?page=${page}&limit=20`,
+  );
+
+  if (result.error) {
+    return json({ designs: [] as Design[], meta: null, error: result.error });
+  }
+
+  return json({
+    designs: result.data?.data ?? [],
+    meta: result.data?.meta ?? null,
+    error: null,
+  });
 }
 
-// TODO: Replace with loader data from API
-const mockDesigns: Design[] = [
-  {
-    id: "DSG-001",
-    name: "Galaxy Nebula Pattern",
-    thumbnailUrl: "/images/placeholder-design.png",
-    copyrightStatus: "registered",
-    createdAt: "2026-03-15",
-    productCount: 5,
-  },
-  {
-    id: "DSG-002",
-    name: "Retro Sunset Wave",
-    thumbnailUrl: "/images/placeholder-design.png",
-    copyrightStatus: "registered",
-    createdAt: "2026-03-20",
-    productCount: 3,
-  },
-  {
-    id: "DSG-003",
-    name: "Minimalist Logo Mark",
-    thumbnailUrl: "/images/placeholder-design.png",
-    copyrightStatus: "pending",
-    createdAt: "2026-04-01",
-    productCount: 0,
-  },
-  {
-    id: "DSG-004",
-    name: "Abstract Geometry",
-    thumbnailUrl: "/images/placeholder-design.png",
-    copyrightStatus: "rejected",
-    createdAt: "2026-04-05",
-    productCount: 0,
-  },
-];
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent === "delete") {
+    const designId = formData.get("designId") as string;
+    if (!designId) {
+      return json({ error: "Missing designId" }, { status: 400 });
+    }
+
+    const result = await apiDelete(`/designs/${designId}`);
+    if (result.error) {
+      return json({ error: result.error }, { status: result.status || 500 });
+    }
+
+    return json({ success: true });
+  }
+
+  return json({ error: "Unknown intent" }, { status: 400 });
+}
+
+function deriveCopyrightStatus(design: Design): "pending" | "registered" | "rejected" {
+  if (design.copyrightTxHash) return "registered";
+  if (design.copyrightAt) return "pending";
+  return "pending";
+}
 
 export default function Designs() {
   const navigate = useNavigate();
+  const { designs, meta: pagination, error } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher();
 
-  if (mockDesigns.length === 0) {
+  if (error) {
+    return (
+      <Page title="Designs">
+        <Banner title="Error loading designs" tone="critical">
+          <p>{error}</p>
+        </Banner>
+      </Page>
+    );
+  }
+
+  if (designs.length === 0) {
     return (
       <Page title="Designs">
         <Card>
@@ -95,18 +113,26 @@ export default function Designs() {
       <Layout>
         <Layout.Section>
           <BlockStack gap="400">
+            {(() => {
+              const d = fetcher.data as { error?: string } | undefined;
+              return d?.error ? (
+                <Banner title="Action failed" tone="critical">
+                  <p>{d.error}</p>
+                </Banner>
+              ) : null;
+            })()}
             <Text as="p" variant="bodySm" tone="subdued">
-              {mockDesigns.length} designs in your library
+              {pagination ? `${pagination.total} designs in your library` : `${designs.length} designs in your library`}
             </Text>
             <InlineGrid columns={{ xs: 1, sm: 2, md: 3, lg: 4 }} gap="400">
-              {mockDesigns.map((design) => (
+              {designs.map((design) => (
                 <DesignCard
                   key={design.id}
                   id={design.id}
                   name={design.name}
-                  thumbnailUrl={design.thumbnailUrl}
-                  copyrightStatus={design.copyrightStatus}
-                  productCount={design.productCount}
+                  thumbnailUrl={design.thumbnailUrl || design.fileUrl || "/images/placeholder-design.png"}
+                  copyrightStatus={deriveCopyrightStatus(design)}
+                  productCount={design.mockups?.length ?? 0}
                 />
               ))}
             </InlineGrid>

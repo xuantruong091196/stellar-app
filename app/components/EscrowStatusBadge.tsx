@@ -1,20 +1,23 @@
 import { Badge } from "@shopify/polaris";
-
-type EscrowStatus = "locked" | "released" | "disputed" | "expired" | "pending";
+import type { EscrowStatus } from "~/lib/types";
+import { ESCROW_STATUS_LABELS } from "~/lib/types";
 
 interface EscrowStatusBadgeProps {
-  status: EscrowStatus;
+  status: EscrowStatus | string;
 }
 
-const statusConfig: Record<EscrowStatus, { label: string; tone: "warning" | "success" | "critical" | "info" | "attention" }> = {
-  locked: { label: "Locked", tone: "warning" },
-  released: { label: "Released", tone: "success" },
-  disputed: { label: "Disputed", tone: "critical" },
-  expired: { label: "Expired", tone: "attention" },
-  pending: { label: "Pending", tone: "info" },
+const toneMap: Record<string, "warning" | "success" | "critical" | "info" | "attention"> = {
+  LOCKING: "info",
+  LOCKED: "warning",
+  RELEASING: "info",
+  RELEASED: "success",
+  DISPUTED: "critical",
+  REFUNDED: "attention",
+  EXPIRED: "attention",
 };
 
 export function EscrowStatusBadge({ status }: EscrowStatusBadgeProps) {
-  const config = statusConfig[status] || { label: status, tone: "info" as const };
-  return <Badge tone={config.tone}>{config.label}</Badge>;
+  const label = ESCROW_STATUS_LABELS[status as EscrowStatus] || status;
+  const tone = toneMap[status] || "info";
+  return <Badge tone={tone}>{label}</Badge>;
 }

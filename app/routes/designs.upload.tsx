@@ -13,22 +13,59 @@ import {
   Thumbnail,
   Box,
 } from "@shopify/polaris";
-import type { MetaFunction } from "@remix-run/node";
-import { useNavigate } from "@remix-run/react";
+import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
+import { useNavigate, useFetcher } from "@remix-run/react";
+import { apiPost } from "~/lib/api";
+import type { Design } from "~/lib/types";
 
 export const meta: MetaFunction = () => {
   return [{ title: "StellarPOD - Upload Design" }];
 };
 
+const STORE_ID = "demo-store";
+
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const name = formData.get("name") as string;
+  const fileBase64 = formData.get("fileBase64") as string;
+  const filename = formData.get("filename") as string;
+  const mimetype = formData.get("mimetype") as string;
+
+  if (!name || !fileBase64 || !filename || !mimetype) {
+    return json(
+      { error: "Missing required fields: name, file data" },
+      { status: 400 },
+    );
+  }
+
+  const result = await apiPost<Design>(`/designs/${STORE_ID}`, {
+    name,
+    fileBase64,
+    filename,
+    mimetype,
+  });
+
+  if (result.error) {
+    return json({ error: result.error, design: null }, { status: result.status || 500 });
+  }
+
+  // Return the design data so we can show copyright hash before redirecting
+  return json({ error: null, design: result.data });
+}
+
 export default function UploadDesign() {
   const navigate = useNavigate();
+  const fetcher = useFetcher<typeof action>();
   const [designName, setDesignName] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+
+  const isSubmitting = fetcher.state === "submitting";
+  const actionData = fetcher.data;
+  const error = actionData && "error" in actionData ? actionData.error : null;
+  const uploadedDesign = actionData && "design" in actionData ? actionData.design : null;
 
   const handleDropZoneDrop = useCallback(
     (_dropFiles: File[], acceptedFiles: File[]) => {
@@ -41,43 +78,26 @@ export default function UploadDesign() {
         }
       }
     },
-    [designName]
+    [designName],
   );
 
   const handleSubmit = useCallback(async () => {
-    if (!file) {
-      setError("Please select a design file to upload.");
-      return;
-    }
-    if (!designName.trim()) {
-      setError("Please enter a design name.");
-      return;
-    }
+    if (!file || !designName.trim()) return;
 
-    setUploading(true);
-    setError(null);
+    // Convert file to base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = (reader.result as string).split(",")[1]; // Remove data:...;base64, prefix
+      const formData = new FormData();
+      formData.set("name", designName.trim());
+      formData.set("fileBase64", base64);
+      formData.set("filename", file.name);
+      formData.set("mimetype", file.type || "image/png");
 
-    try {
-      // TODO: Upload file to stellarpod-api
-      // const formData = new FormData();
-      // formData.append("file", file);
-      // formData.append("name", designName);
-      // formData.append("description", description);
-      // const response = await fetch(`${API_URL}/api/v1/designs`, {
-      //   method: "POST",
-      //   body: formData,
-      // });
-
-      // Simulate upload delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      setSuccess(true);
-    } catch {
-      setError("Failed to upload design. Please try again.");
-    } finally {
-      setUploading(false);
-    }
-  }, [file, designName, description]);
+      fetcher.submit(formData, { method: "POST" });
+    };
+    reader.readAsDataURL(file);
+  }, [file, designName, fetcher]);
 
   const fileUpload = !file && (
     <DropZone.FileUpload actionTitle="Upload design file" actionHint="or drop files to upload" />
@@ -104,17 +124,32 @@ export default function UploadDesign() {
     >
       <BlockStack gap="500">
         {error && (
-          <Banner title="Upload Error" tone="critical" onDismiss={() => setError(null)}>
+          <Banner title="Upload Error" tone="critical">
             <p>{error}</p>
           </Banner>
         )}
 
-        {success && (
-          <Banner title="Design Uploaded" tone="success" onDismiss={() => setSuccess(false)}>
-            <p>
-              Your design has been uploaded successfully. Copyright registration is in progress
-              on the Stellar blockchain.
-            </p>
+        {uploadedDesign && (
+          <Banner title="Design Uploaded" tone="success">
+            <BlockStack gap="200">
+              <p>
+                Your design "{uploadedDesign.name}" has been uploaded successfully.
+                Copyright registration is in progress on the Stellar blockchain.
+              </p>
+              {uploadedDesign.fileSha256 && (
+                <p>
+                  <Text as="span" fontWeight="bold">File Hash (SHA-256): </Text>
+                  <Text as="span" variant="bodySm">{uploadedDesign.fileSha256}</Text>
+                </p>
+              )}
+              {uploadedDesign.copyrightTxHash && (
+                <p>
+                  <Text as="span" fontWeight="bold">Copyright TX: </Text>
+                  <Text as="span" variant="bodySm">{uploadedDesign.copyrightTxHash}</Text>
+                </p>
+              )}
+              <Button onClick={() => navigate("/designs")}>Back to Designs</Button>
+            </BlockStack>
           </Banner>
         )}
 
@@ -204,8 +239,8 @@ export default function UploadDesign() {
           <Button
             variant="primary"
             onClick={handleSubmit}
-            loading={uploading}
-            disabled={!file || !designName.trim()}
+            loading={isSubmitting}
+            disabled={!file || !designName.trim() || isSubmitting}
           >
             Upload Design
           </Button>

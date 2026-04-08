@@ -12,82 +12,145 @@ import {
   Text,
   Box,
   Divider,
+  TextField,
+  Spinner,
 } from "@shopify/polaris";
-import type { MetaFunction } from "@remix-run/node";
-import { useParams, useNavigate } from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { useLoaderData, useNavigate, useFetcher } from "@remix-run/react";
+import { apiGet, apiPost } from "~/lib/api";
+import type { Order, OrderStatus } from "~/lib/types";
+import { ORDER_STATUS_LABELS } from "~/lib/types";
 import { EscrowStatusBadge } from "~/components/EscrowStatusBadge";
 
 export const meta: MetaFunction = () => {
   return [{ title: "StellarPOD - Order Detail" }];
 };
 
-// TODO: Replace with loader data from API
-const mockOrder = {
-  id: "ORD-1042",
-  shopifyOrderId: "#1042",
-  customer: {
-    name: "John Doe",
-    email: "john@example.com",
-    address: "123 Main St, New York, NY 10001",
-  },
-  items: [
-    { name: "Custom T-Shirt - Galaxy Design", quantity: 2, price: "$24.99", sku: "TSH-GAL-M" },
-    { name: "Custom Mug - Logo Print", quantity: 1, price: "$14.99", sku: "MUG-LOG-STD" },
-  ],
-  total: "$64.97",
-  status: "in_production" as const,
-  escrow: {
-    id: "ESC-001",
-    status: "locked" as const,
-    amount: "$64.97",
-    lockedAt: "2026-04-07T10:30:00Z",
-    stellarTxHash: "abc123...def456",
-  },
-  provider: {
-    name: "PrintMaster Co.",
-    country: "United States",
-  },
-  shipping: {
-    carrier: "USPS",
-    trackingNumber: "",
-    estimatedDelivery: "2026-04-14",
-  },
-  createdAt: "2026-04-07",
+export async function loader({ params }: LoaderFunctionArgs) {
+  const { orderId } = params;
+  if (!orderId) {
+    throw new Response("Order ID is required", { status: 400 });
+  }
+
+  const res = await apiGet<Order>(`/orders/detail/${orderId}`);
+
+  if (res.error) {
+    throw new Response(res.error, { status: res.status || 500 });
+  }
+
+  return json({ order: res.data! });
+}
+
+export async function action({ request, params }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get("intent") as string;
+  const { orderId } = params;
+
+  if (!orderId) {
+    return json({ error: "Order ID is required" }, { status: 400 });
+  }
+
+  switch (intent) {
+    case "release": {
+      const escrowId = formData.get("escrowId") as string;
+      if (!escrowId) {
+        return json({ error: "Escrow ID is required" }, { status: 400 });
+      }
+      const res = await apiPost(`/escrow/${escrowId}/release`, {});
+      if (res.error) {
+        return json({ error: res.error }, { status: res.status || 500 });
+      }
+      return json({ success: true, message: "Escrow funds released successfully" });
+    }
+
+    case "dispute": {
+      const escrowId = formData.get("escrowId") as string;
+      const reason = formData.get("reason") as string;
+      if (!escrowId) {
+        return json({ error: "Escrow ID is required" }, { status: 400 });
+      }
+      const res = await apiPost(`/escrow/${escrowId}/dispute`, {
+        raisedBy: "merchant",
+        reason: reason || "Dispute raised by merchant",
+      });
+      if (res.error) {
+        return json({ error: res.error }, { status: res.status || 500 });
+      }
+      return json({ success: true, message: "Dispute opened successfully" });
+    }
+
+    case "cancel": {
+      const res = await apiPost(`/orders/${orderId}/cancel`, {});
+      if (res.error) {
+        return json({ error: res.error }, { status: res.status || 500 });
+      }
+      return json({ success: true, message: "Order cancelled successfully" });
+    }
+
+    default:
+      return json({ error: `Unknown intent: ${intent}` }, { status: 400 });
+  }
+}
+
+const orderStatusTone: Record<OrderStatus, "warning" | "info" | "success" | "critical" | "attention"> = {
+  PENDING: "warning",
+  ESCROW_LOCKED: "warning",
+  SENT_TO_PROVIDER: "info",
+  IN_PRODUCTION: "info",
+  SHIPPED: "success",
+  DELIVERED: "success",
+  ESCROW_RELEASED: "success",
+  DISPUTED: "critical",
+  CANCELLED: "critical",
+  REFUNDED: "attention",
 };
 
 export default function OrderDetail() {
-  const { orderId } = useParams();
+  const { order } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
+  const fetcher = useFetcher<{ error?: string; success?: boolean; message?: string }>();
   const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
   const [showDisputeConfirm, setShowDisputeConfirm] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
 
-  const handleRelease = useCallback(() => {
-    // TODO: Call API to release escrow funds
-    console.log("Releasing escrow for order:", orderId);
-    setShowReleaseConfirm(false);
-  }, [orderId]);
+  const isSubmitting = fetcher.state !== "idle";
 
-  const handleDispute = useCallback(() => {
-    // TODO: Call API to dispute escrow
-    console.log("Disputing escrow for order:", orderId);
-    setShowDisputeConfirm(false);
-  }, [orderId]);
+  const shippingAddress = order.shippingAddress as Record<string, string> | null;
 
-  const itemRows = mockOrder.items.map((item) => [
-    item.name,
-    item.sku,
+  const itemRows = (order.items ?? []).map((item) => [
+    `${item.productType} — ${item.variant}`,
+    item.id.slice(0, 8),
     item.quantity,
-    item.price,
+    `$${item.unitPrice.toFixed(2)}`,
   ]);
 
   return (
     <Page
-      title={`Order ${mockOrder.shopifyOrderId}`}
+      title={`Order #${order.shopifyOrderNumber}`}
       backAction={{ content: "Orders", onAction: () => navigate("/orders") }}
-      subtitle={`Created ${mockOrder.createdAt}`}
+      subtitle={`Created ${new Date(order.createdAt).toLocaleDateString()}`}
+      titleMetadata={
+        <Badge tone={orderStatusTone[order.status] || "info"}>
+          {ORDER_STATUS_LABELS[order.status] || order.status}
+        </Badge>
+      }
     >
       <BlockStack gap="500">
-        {showReleaseConfirm && (
+        {fetcher.data?.error && (
+          <Banner title="Action Failed" tone="critical" onDismiss={() => {}}>
+            <p>{fetcher.data.error}</p>
+          </Banner>
+        )}
+
+        {fetcher.data?.success && (
+          <Banner title="Success" tone="success" onDismiss={() => {}}>
+            <p>{fetcher.data.message}</p>
+          </Banner>
+        )}
+
+        {showReleaseConfirm && order.escrow && (
           <Banner
             title="Confirm Escrow Release"
             tone="warning"
@@ -95,18 +158,24 @@ export default function OrderDetail() {
           >
             <BlockStack gap="200">
               <Text as="p">
-                This will release {mockOrder.escrow.amount} USDC to the print provider.
+                This will release ${order.escrow.amountUsdc.toFixed(2)} USDC to the print provider.
                 This action cannot be undone.
               </Text>
               <InlineStack gap="200">
-                <Button variant="primary" onClick={handleRelease}>Confirm Release</Button>
+                <fetcher.Form method="post">
+                  <input type="hidden" name="intent" value="release" />
+                  <input type="hidden" name="escrowId" value={order.escrow.id} />
+                  <Button variant="primary" submit disabled={isSubmitting}>
+                    {isSubmitting ? "Releasing..." : "Confirm Release"}
+                  </Button>
+                </fetcher.Form>
                 <Button onClick={() => setShowReleaseConfirm(false)}>Cancel</Button>
               </InlineStack>
             </BlockStack>
           </Banner>
         )}
 
-        {showDisputeConfirm && (
+        {showDisputeConfirm && order.escrow && (
           <Banner
             title="Open Dispute"
             tone="critical"
@@ -116,9 +185,46 @@ export default function OrderDetail() {
               <Text as="p">
                 This will flag the escrow for review. Funds will remain locked until the dispute is resolved.
               </Text>
+              <TextField
+                label="Reason for dispute"
+                value={disputeReason}
+                onChange={setDisputeReason}
+                multiline={3}
+                autoComplete="off"
+              />
               <InlineStack gap="200">
-                <Button variant="primary" tone="critical" onClick={handleDispute}>Confirm Dispute</Button>
+                <fetcher.Form method="post">
+                  <input type="hidden" name="intent" value="dispute" />
+                  <input type="hidden" name="escrowId" value={order.escrow.id} />
+                  <input type="hidden" name="reason" value={disputeReason} />
+                  <Button variant="primary" tone="critical" submit disabled={isSubmitting}>
+                    {isSubmitting ? "Submitting..." : "Confirm Dispute"}
+                  </Button>
+                </fetcher.Form>
                 <Button onClick={() => setShowDisputeConfirm(false)}>Cancel</Button>
+              </InlineStack>
+            </BlockStack>
+          </Banner>
+        )}
+
+        {showCancelConfirm && (
+          <Banner
+            title="Cancel Order"
+            tone="critical"
+            onDismiss={() => setShowCancelConfirm(false)}
+          >
+            <BlockStack gap="200">
+              <Text as="p">
+                Are you sure you want to cancel this order? This may trigger a refund.
+              </Text>
+              <InlineStack gap="200">
+                <fetcher.Form method="post">
+                  <input type="hidden" name="intent" value="cancel" />
+                  <Button variant="primary" tone="critical" submit disabled={isSubmitting}>
+                    {isSubmitting ? "Cancelling..." : "Confirm Cancel"}
+                  </Button>
+                </fetcher.Form>
+                <Button onClick={() => setShowCancelConfirm(false)}>Keep Order</Button>
               </InlineStack>
             </BlockStack>
           </Banner>
@@ -131,10 +237,24 @@ export default function OrderDetail() {
                 <Text as="h2" variant="headingMd">Order Items</Text>
                 <DataTable
                   columnContentTypes={["text", "text", "numeric", "numeric"]}
-                  headings={["Product", "SKU", "Qty", "Price"]}
+                  headings={["Product", "ID", "Qty", "Unit Price"]}
                   rows={itemRows}
-                  totals={["", "", "", mockOrder.total]}
+                  totals={["", "", "", `$${order.totalUsdc.toFixed(2)}`]}
                 />
+                <BlockStack gap="100">
+                  <InlineStack align="space-between">
+                    <Text as="span" variant="bodySm" tone="subdued">Subtotal</Text>
+                    <Text as="span" variant="bodySm">${order.subtotalUsdc.toFixed(2)}</Text>
+                  </InlineStack>
+                  <InlineStack align="space-between">
+                    <Text as="span" variant="bodySm" tone="subdued">Platform Fee</Text>
+                    <Text as="span" variant="bodySm">${order.platformFeeUsdc.toFixed(2)}</Text>
+                  </InlineStack>
+                  <InlineStack align="space-between">
+                    <Text as="span" variant="bodySm" tone="subdued">Provider Pay</Text>
+                    <Text as="span" variant="bodySm">${order.providerPayUsdc.toFixed(2)}</Text>
+                  </InlineStack>
+                </BlockStack>
               </BlockStack>
             </Card>
 
@@ -144,18 +264,30 @@ export default function OrderDetail() {
                   <Text as="h2" variant="headingMd">Shipping</Text>
                   <BlockStack gap="200">
                     <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">Carrier</Text>
-                      <Text as="span" variant="bodyMd">{mockOrder.shipping.carrier}</Text>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">Tracking</Text>
+                      <Text as="span" variant="bodyMd">Tracking Number</Text>
                       <Text as="span" variant="bodyMd">
-                        {mockOrder.shipping.trackingNumber || "Not yet available"}
+                        {order.trackingNumber || "Not yet available"}
+                      </Text>
+                    </InlineStack>
+                    {order.trackingUrl && (
+                      <InlineStack align="space-between">
+                        <Text as="span" variant="bodyMd">Tracking URL</Text>
+                        <Button variant="plain" url={order.trackingUrl} external>
+                          Track Package
+                        </Button>
+                      </InlineStack>
+                    )}
+                    <InlineStack align="space-between">
+                      <Text as="span" variant="bodyMd">Shipped At</Text>
+                      <Text as="span" variant="bodyMd">
+                        {order.shippedAt ? new Date(order.shippedAt).toLocaleDateString() : "—"}
                       </Text>
                     </InlineStack>
                     <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">Est. Delivery</Text>
-                      <Text as="span" variant="bodyMd">{mockOrder.shipping.estimatedDelivery}</Text>
+                      <Text as="span" variant="bodyMd">Delivered At</Text>
+                      <Text as="span" variant="bodyMd">
+                        {order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString() : "—"}
+                      </Text>
                     </InlineStack>
                   </BlockStack>
                 </BlockStack>
@@ -164,48 +296,104 @@ export default function OrderDetail() {
           </Layout.Section>
 
           <Layout.Section variant="oneThird">
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">Escrow</Text>
-                <Divider />
-                <BlockStack gap="200">
-                  <InlineStack align="space-between">
-                    <Text as="span" variant="bodyMd">Status</Text>
-                    <EscrowStatusBadge status={mockOrder.escrow.status} />
-                  </InlineStack>
-                  <InlineStack align="space-between">
-                    <Text as="span" variant="bodyMd">Amount</Text>
-                    <Text as="span" variant="bodyMd" fontWeight="bold">{mockOrder.escrow.amount}</Text>
-                  </InlineStack>
-                  <InlineStack align="space-between">
-                    <Text as="span" variant="bodyMd">Locked At</Text>
-                    <Text as="span" variant="bodySm">{new Date(mockOrder.escrow.lockedAt).toLocaleDateString()}</Text>
-                  </InlineStack>
-                  <InlineStack align="space-between">
-                    <Text as="span" variant="bodyMd">Tx Hash</Text>
-                    <Text as="span" variant="bodySm" tone="subdued">{mockOrder.escrow.stellarTxHash}</Text>
+            {order.escrow && (
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">Escrow</Text>
+                  <Divider />
+                  <BlockStack gap="200">
+                    <InlineStack align="space-between">
+                      <Text as="span" variant="bodyMd">Status</Text>
+                      <EscrowStatusBadge status={order.escrow.status} />
+                    </InlineStack>
+                    <InlineStack align="space-between">
+                      <Text as="span" variant="bodyMd">Amount</Text>
+                      <Text as="span" variant="bodyMd" fontWeight="bold">
+                        ${order.escrow.amountUsdc.toFixed(2)}
+                      </Text>
+                    </InlineStack>
+                    <InlineStack align="space-between">
+                      <Text as="span" variant="bodyMd">Platform Fee</Text>
+                      <Text as="span" variant="bodySm">${order.escrow.platformFee.toFixed(2)}</Text>
+                    </InlineStack>
+                    <InlineStack align="space-between">
+                      <Text as="span" variant="bodyMd">Provider Amount</Text>
+                      <Text as="span" variant="bodySm">${order.escrow.providerAmount.toFixed(2)}</Text>
+                    </InlineStack>
+                    {order.escrow.lockedAt && (
+                      <InlineStack align="space-between">
+                        <Text as="span" variant="bodyMd">Locked At</Text>
+                        <Text as="span" variant="bodySm">
+                          {new Date(order.escrow.lockedAt).toLocaleDateString()}
+                        </Text>
+                      </InlineStack>
+                    )}
+                    {order.escrow.lockTxHash && (
+                      <InlineStack align="space-between">
+                        <Text as="span" variant="bodyMd">Lock Tx</Text>
+                        <Text as="span" variant="bodySm" tone="subdued">
+                          {order.escrow.lockTxHash.slice(0, 12)}...
+                        </Text>
+                      </InlineStack>
+                    )}
+                    {order.escrow.releaseTxHash && (
+                      <InlineStack align="space-between">
+                        <Text as="span" variant="bodyMd">Release Tx</Text>
+                        <Text as="span" variant="bodySm" tone="subdued">
+                          {order.escrow.releaseTxHash.slice(0, 12)}...
+                        </Text>
+                      </InlineStack>
+                    )}
+                    <InlineStack align="space-between">
+                      <Text as="span" variant="bodyMd">Expires</Text>
+                      <Text as="span" variant="bodySm">
+                        {new Date(order.escrow.expiresAt).toLocaleDateString()}
+                      </Text>
+                    </InlineStack>
+                  </BlockStack>
+                  <Divider />
+                  <InlineStack gap="200">
+                    {order.escrow.status === "LOCKED" && (
+                      <Button variant="primary" onClick={() => setShowReleaseConfirm(true)}>
+                        Release Funds
+                      </Button>
+                    )}
+                    {(order.escrow.status === "LOCKED" || order.escrow.status === "LOCKING") && (
+                      <Button variant="primary" tone="critical" onClick={() => setShowDisputeConfirm(true)}>
+                        Dispute
+                      </Button>
+                    )}
                   </InlineStack>
                 </BlockStack>
-                <Divider />
-                <InlineStack gap="200">
-                  <Button variant="primary" onClick={() => setShowReleaseConfirm(true)}>
-                    Release Funds
-                  </Button>
-                  <Button variant="primary" tone="critical" onClick={() => setShowDisputeConfirm(true)}>
-                    Dispute
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-            </Card>
+              </Card>
+            )}
+
+            {!order.escrow && (
+              <Card>
+                <BlockStack gap="200">
+                  <Text as="h2" variant="headingMd">Escrow</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">No escrow record for this order.</Text>
+                </BlockStack>
+              </Card>
+            )}
 
             <Box paddingBlockStart="400">
               <Card>
                 <BlockStack gap="300">
                   <Text as="h2" variant="headingMd">Customer</Text>
                   <BlockStack gap="200">
-                    <Text as="p" variant="bodyMd" fontWeight="bold">{mockOrder.customer.name}</Text>
-                    <Text as="p" variant="bodySm">{mockOrder.customer.email}</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">{mockOrder.customer.address}</Text>
+                    <Text as="p" variant="bodyMd" fontWeight="bold">{order.customerName}</Text>
+                    {shippingAddress && (
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {[
+                          shippingAddress.address1,
+                          shippingAddress.city,
+                          shippingAddress.province,
+                          shippingAddress.zip,
+                          shippingAddress.country,
+                        ].filter(Boolean).join(", ")}
+                      </Text>
+                    )}
                   </BlockStack>
                 </BlockStack>
               </Card>
@@ -214,10 +402,13 @@ export default function OrderDetail() {
             <Box paddingBlockStart="400">
               <Card>
                 <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">Print Provider</Text>
+                  <Text as="h2" variant="headingMd">Actions</Text>
                   <BlockStack gap="200">
-                    <Text as="p" variant="bodyMd" fontWeight="bold">{mockOrder.provider.name}</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">{mockOrder.provider.country}</Text>
+                    {order.status === "PENDING" && (
+                      <Button tone="critical" onClick={() => setShowCancelConfirm(true)}>
+                        Cancel Order
+                      </Button>
+                    )}
                   </BlockStack>
                 </BlockStack>
               </Card>

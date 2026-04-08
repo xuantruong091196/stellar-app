@@ -1,6 +1,6 @@
 const API_BASE_URL = typeof process !== "undefined"
-  ? process.env.STELLARPOD_API_URL || "http://localhost:8000"
-  : "http://localhost:8000";
+  ? process.env.STELLARPOD_API_URL || "http://localhost:3000"
+  : "http://localhost:3000";
 
 interface ApiOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -66,6 +66,9 @@ export const apiPost = <T>(endpoint: string, body: unknown, token?: string) =>
 
 export const apiPut = <T>(endpoint: string, body: unknown, token?: string) =>
   api<T>(endpoint, { method: "PUT", body, token });
+
+export const apiPatch = <T>(endpoint: string, body: unknown, token?: string) =>
+  api<T>(endpoint, { method: "PATCH", body, token });
 
 export const apiDelete = <T>(endpoint: string, token?: string) =>
   api<T>(endpoint, { method: "DELETE", token });
