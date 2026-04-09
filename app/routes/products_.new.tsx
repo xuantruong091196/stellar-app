@@ -9,6 +9,7 @@ import {
   useFetcher,
   useNavigate,
   useLoaderData,
+  useSearchParams,
   Link,
 } from "@remix-run/react";
 import { apiGet, apiPost } from "~/lib/api";
@@ -116,6 +117,8 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function CreateProduct() {
   const navigate = useNavigate();
   const { walletAddress } = useLoaderData<typeof loader>();
+  const [searchParams] = useSearchParams();
+  const preselectedBlankId = searchParams.get("blank");
   const fetcher = useFetcher<{
     success?: boolean;
     error?: string;
@@ -189,6 +192,18 @@ export default function CreateProduct() {
       }
     }
   }, [selectedProduct]);
+
+  // If we arrived via `?blank=<id>` from the providers catalog, auto-select
+  // that blank and advance to the next wizard step once the catalog is loaded.
+  useEffect(() => {
+    if (!preselectedBlankId || selectedProduct) return;
+    if (providerProducts.length === 0) return;
+    const match = providerProducts.find((p) => p.id === preselectedBlankId);
+    if (match) {
+      setSelectedProduct(match);
+      setStep(1);
+    }
+  }, [preselectedBlankId, providerProducts, selectedProduct]);
 
   const fetchPricing = useCallback(
     (price: string) => {

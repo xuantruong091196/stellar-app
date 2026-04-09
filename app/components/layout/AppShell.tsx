@@ -18,12 +18,6 @@ const NAV_ITEMS: NavItem[] = [
     match: (p) => p.startsWith("/products"),
   },
   {
-    label: "Catalog",
-    icon: "storefront",
-    href: "/catalog",
-    match: (p) => p.startsWith("/catalog"),
-  },
-  {
     label: "Orders",
     icon: "shopping_cart",
     href: "/orders",

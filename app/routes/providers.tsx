@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type {
   MetaFunction,
   LoaderFunctionArgs,
@@ -11,17 +11,19 @@ import { requireUser } from "~/lib/session.server";
 import type {
   Provider,
   StoreProvider,
+  ProviderProduct,
   PaginatedResponse,
 } from "~/lib/types";
 import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
 import { Pill } from "~/components/ui/StatusPill";
+import { LinkButton, Button } from "~/components/ui/Button";
 import { pageMeta } from "~/lib/seo";
 
 export const meta: MetaFunction = () =>
   pageMeta({
     title: "Print Providers",
     description:
-      "Discover verified print-on-demand partners on the Stellar network. Compare quality, lead times, specialties and rates.",
+      "Discover verified print-on-demand partners on the Stellar network. Compare quality, lead times, specialties and browse their blank catalog.",
     path: "/providers",
     noIndex: true,
   });
@@ -38,21 +40,64 @@ const SPECIALTIES = [
   "Phone Cases",
   "Canvas",
 ];
+const PRODUCT_TYPES = ["", "T-Shirt", "Hoodie", "Mug", "Poster", "Tote Bag"];
+
+type Tab = "providers" | "catalog";
 
 interface LoaderData {
+  tab: Tab;
   providers: Provider[];
   connectedProviderIds: string[];
-  meta: PaginatedResponse<Provider>["meta"] | null;
+  providersMeta: PaginatedResponse<Provider>["meta"] | null;
+  blanks: ProviderProduct[];
+  blanksMeta: PaginatedResponse<ProviderProduct>["meta"] | null;
   error: string | null;
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const walletAddress = await requireUser(request);
   const url = new URL(request.url);
-  const country = url.searchParams.get("country") || "";
-  const specialty = url.searchParams.get("specialty") || "";
+  const tab: Tab = url.searchParams.get("tab") === "catalog" ? "catalog" : "providers";
   const page = url.searchParams.get("page") || "1";
 
+  // Connected provider IDs are needed by both tabs
+  const connectedPromise = apiGet<StoreProvider[]>(
+    `/providers/connected/${STORE_ID}`,
+    walletAddress,
+  );
+
+  if (tab === "catalog") {
+    const productType = url.searchParams.get("productType") || "";
+    const blanksParams = new URLSearchParams();
+    blanksParams.set("page", page);
+    blanksParams.set("limit", "20");
+    if (productType)
+      blanksParams.set("productType", productType);
+
+    const [blanksResult, connectedResult] = await Promise.all([
+      apiGet<PaginatedResponse<ProviderProduct>>(
+        `/provider-products?${blanksParams.toString()}`,
+        walletAddress,
+      ),
+      connectedPromise,
+    ]);
+
+    return json<LoaderData>({
+      tab,
+      providers: [],
+      connectedProviderIds: Array.isArray(connectedResult.data)
+        ? connectedResult.data.map((sp) => sp.providerId)
+        : [],
+      providersMeta: null,
+      blanks: blanksResult.data?.data ?? [],
+      blanksMeta: blanksResult.data?.meta ?? null,
+      error: blanksResult.error,
+    });
+  }
+
+  // Providers tab
+  const country = url.searchParams.get("country") || "";
+  const specialty = url.searchParams.get("specialty") || "";
   const params = new URLSearchParams();
   if (country) params.set("country", country);
   if (specialty) params.set("specialty", specialty);
@@ -64,30 +109,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
       `/providers/search?${params.toString()}`,
       walletAddress,
     ),
-    apiGet<StoreProvider[]>(
-      `/providers/connected/${STORE_ID}`,
-      walletAddress,
-    ),
+    connectedPromise,
   ]);
 
-  if (providersResult.error) {
-    return json<LoaderData>({
-      providers: [],
-      connectedProviderIds: [],
-      meta: null,
-      error: providersResult.error,
-    });
-  }
-
-  const connectedIds = Array.isArray(connectedResult.data)
-    ? connectedResult.data.map((sp) => sp.providerId)
-    : [];
-
   return json<LoaderData>({
+    tab,
     providers: providersResult.data?.data ?? [],
-    connectedProviderIds: connectedIds,
-    meta: providersResult.data?.meta ?? null,
-    error: null,
+    connectedProviderIds: Array.isArray(connectedResult.data)
+      ? connectedResult.data.map((sp) => sp.providerId)
+      : [],
+    providersMeta: providersResult.data?.meta ?? null,
+    blanks: [],
+    blanksMeta: null,
+    error: providersResult.error,
   });
 }
 
@@ -128,20 +162,36 @@ function starRating(n: number) {
 }
 
 export default function Providers() {
-  const { providers, connectedProviderIds, meta: pagination, error } =
-    useLoaderData<typeof loader>();
+  const {
+    tab,
+    providers,
+    connectedProviderIds,
+    providersMeta,
+    blanks,
+    blanksMeta,
+    error,
+  } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
   const fetcher = useFetcher<{ error?: string }>();
-
-  const countryFilter = searchParams.get("country") || "";
-  const specialtyFilter = searchParams.get("specialty") || "";
-  const searchQuery = searchParams.get("q") || "";
+  const [selected, setSelected] = useState<ProviderProduct | null>(null);
 
   const setParam = useCallback(
     (key: string, value: string) => {
       const params = new URLSearchParams(searchParams);
       if (value) params.set(key, value);
       else params.delete(key);
+      params.delete("page");
+      setSearchParams(params);
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const switchTab = useCallback(
+    (next: Tab) => {
+      const params = new URLSearchParams(searchParams);
+      if (next === "catalog") params.set("tab", "catalog");
+      else params.delete("tab");
+      // Reset pagination when switching tabs
       params.delete("page");
       setSearchParams(params);
     },
@@ -159,18 +209,36 @@ export default function Providers() {
     [connectedProviderIds, fetcher],
   );
 
-  const filtered = searchQuery
-    ? providers.filter((p) =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()),
-      )
-    : providers;
-
   return (
     <>
       <PageHeader
         title="Print Providers"
-        subtitle="Connect with verified partners on the Stellar network"
+        subtitle="Browse partners on the Stellar network and their blank catalog"
       />
+
+      {/* Tab switcher */}
+      <div className="flex items-center gap-2 bg-surface-container-low p-2 rounded-full w-fit">
+        <button
+          onClick={() => switchTab("providers")}
+          className={
+            tab === "providers"
+              ? "stellar-gradient text-white px-5 py-2 rounded-full text-sm font-bold"
+              : "text-on-surface-variant hover:text-on-surface px-5 py-2 rounded-full text-sm font-medium transition-colors"
+          }
+        >
+          Providers
+        </button>
+        <button
+          onClick={() => switchTab("catalog")}
+          className={
+            tab === "catalog"
+              ? "stellar-gradient text-white px-5 py-2 rounded-full text-sm font-bold"
+              : "text-on-surface-variant hover:text-on-surface px-5 py-2 rounded-full text-sm font-medium transition-colors"
+          }
+        >
+          Blank Catalog
+        </button>
+      </div>
 
       {error && (
         <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-6 py-4 rounded-2xl">
@@ -183,7 +251,62 @@ export default function Providers() {
         </div>
       )}
 
-      {/* Filter card */}
+      {tab === "providers" ? (
+        <ProvidersTab
+          providers={providers}
+          connectedProviderIds={connectedProviderIds}
+          meta={providersMeta}
+          searchParams={searchParams}
+          setParam={setParam}
+          onConnect={handleConnect}
+        />
+      ) : (
+        <CatalogTab
+          blanks={blanks}
+          meta={blanksMeta}
+          currentType={searchParams.get("productType") || ""}
+          onTypeChange={(t) => setParam("productType", t)}
+          onOpenDetail={setSelected}
+          onPageChange={(p) => setParam("page", String(p))}
+        />
+      )}
+
+      {selected && (
+        <BlankDetailModal blank={selected} onClose={() => setSelected(null)} />
+      )}
+    </>
+  );
+}
+
+// ─── Providers tab ──────────────────────────────────────────────────
+
+function ProvidersTab({
+  providers,
+  connectedProviderIds,
+  meta,
+  searchParams,
+  setParam,
+  onConnect,
+}: {
+  providers: Provider[];
+  connectedProviderIds: string[];
+  meta: PaginatedResponse<Provider>["meta"] | null;
+  searchParams: URLSearchParams;
+  setParam: (key: string, value: string) => void;
+  onConnect: (providerId: string) => void;
+}) {
+  const countryFilter = searchParams.get("country") || "";
+  const specialtyFilter = searchParams.get("specialty") || "";
+  const searchQuery = searchParams.get("q") || "";
+
+  const filtered = searchQuery
+    ? providers.filter((p) =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
+    : providers;
+
+  return (
+    <>
       <section className="bg-surface-container-low rounded-2xl p-6 space-y-4">
         <div className="relative">
           <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
@@ -235,7 +358,7 @@ export default function Providers() {
       </section>
 
       <p className="text-xs text-on-surface-variant font-mono">
-        {pagination?.total ?? filtered.length} providers •{" "}
+        {meta?.total ?? filtered.length} providers •{" "}
         <span className="text-green-400">
           {connectedProviderIds.length} connected
         </span>
@@ -326,7 +449,7 @@ export default function Providers() {
 
                 <div className="pt-2">
                   <button
-                    onClick={() => handleConnect(p.id)}
+                    onClick={() => onConnect(p.id)}
                     className={
                       isConnected
                         ? "w-full py-2.5 rounded-full bg-green-500/10 text-green-400 border border-green-400/20 text-xs font-bold uppercase tracking-wider hover:bg-green-500/20 transition-colors"
@@ -342,5 +465,340 @@ export default function Providers() {
         </section>
       )}
     </>
+  );
+}
+
+// ─── Blank catalog tab ─────────────────────────────────────────────
+
+function CatalogTab({
+  blanks,
+  meta,
+  currentType,
+  onTypeChange,
+  onOpenDetail,
+  onPageChange,
+}: {
+  blanks: ProviderProduct[];
+  meta: PaginatedResponse<ProviderProduct>["meta"] | null;
+  currentType: string;
+  onTypeChange: (t: string) => void;
+  onOpenDetail: (p: ProviderProduct) => void;
+  onPageChange: (page: number) => void;
+}) {
+  return (
+    <>
+      {/* Filter chips */}
+      <section className="bg-surface-container-low rounded-2xl p-6">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant mr-2">
+            Filter:
+          </span>
+          {PRODUCT_TYPES.map((type) => {
+            const label = type || "All Types";
+            const active = currentType === type;
+            return (
+              <button
+                key={label}
+                onClick={() => onTypeChange(type)}
+                className={
+                  active
+                    ? "stellar-gradient text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider"
+                    : "bg-surface-container-high text-on-surface-variant hover:text-on-surface px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors"
+                }
+              >
+                {label}
+              </button>
+            );
+          })}
+          <span className="ml-auto text-xs text-on-surface-variant font-mono">
+            {meta?.total ?? blanks.length} blank
+            {(meta?.total ?? blanks.length) !== 1 ? "s" : ""}
+          </span>
+        </div>
+      </section>
+
+      {blanks.length === 0 ? (
+        <section className="bg-surface-container-low rounded-2xl">
+          <EmptyState
+            icon="storefront"
+            title="No blanks found"
+            description="Try adjusting the filter or connecting more providers."
+          />
+        </section>
+      ) : (
+        <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {blanks.map((pp) => {
+            const img = Object.values(pp.blankImages)[0];
+            const sizes = pp.variants
+              ? [...new Set(pp.variants.map((v) => v.size))]
+              : [];
+            const colors = pp.variants
+              ? [...new Set(pp.variants.map((v) => v.color))]
+              : [];
+            return (
+              <div
+                key={pp.id}
+                className="bg-surface-container-low hover:bg-surface-container-high transition-colors p-4 rounded-2xl flex flex-col"
+              >
+                <button
+                  onClick={() => onOpenDetail(pp)}
+                  className="text-left group"
+                >
+                  <div className="w-full h-44 rounded-xl bg-surface-container-highest mb-4 flex items-center justify-center overflow-hidden">
+                    {img ? (
+                      <img
+                        src={img}
+                        alt={pp.name}
+                        className="w-full h-full object-contain p-4"
+                      />
+                    ) : (
+                      <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">
+                        checkroom
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-bold mb-1 group-hover:text-primary transition-colors truncate">
+                    {pp.name}
+                  </h3>
+                  {pp.brand && (
+                    <p className="text-xs text-on-surface-variant">
+                      {pp.brand}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between mt-3">
+                    <span className="px-2 py-0.5 rounded-full bg-[#6366F1]/10 text-[#6366F1] text-[10px] font-bold uppercase">
+                      {pp.productType}
+                    </span>
+                    <span className="font-mono font-bold">
+                      ${pp.baseCost.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    {sizes.length > 0 && (
+                      <p className="text-[10px] text-on-surface-variant">
+                        Sizes: {sizes.slice(0, 5).join(", ")}
+                        {sizes.length > 5 && "…"}
+                      </p>
+                    )}
+                    {colors.length > 0 && (
+                      <p className="text-[10px] text-on-surface-variant">
+                        {colors.length} colors available
+                      </p>
+                    )}
+                    <p className="text-[10px] text-on-surface-variant">
+                      {pp.productionDays} day
+                      {pp.productionDays !== 1 ? "s" : ""} production
+                    </p>
+                  </div>
+                </button>
+                <div className="mt-4">
+                  <LinkButton
+                    to={`/products/new?blank=${pp.id}`}
+                    icon="arrow_forward"
+                    className="!w-full !px-4 !py-2 !text-xs"
+                  >
+                    Use this blank
+                  </LinkButton>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      {/* Pagination */}
+      {meta && meta.totalPages > 1 && (
+        <section className="bg-surface-container-low rounded-2xl px-6 py-4 flex items-center justify-between">
+          <span className="text-sm text-on-surface-variant">
+            Page {meta.page} / {meta.totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            {meta.page > 1 && (
+              <Button
+                variant="secondary"
+                className="!py-2"
+                onClick={() => onPageChange(meta.page - 1)}
+              >
+                Previous
+              </Button>
+            )}
+            {meta.page < meta.totalPages && (
+              <Button
+                variant="secondary"
+                className="!py-2"
+                onClick={() => onPageChange(meta.page + 1)}
+              >
+                Next
+              </Button>
+            )}
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
+
+// ─── Blank detail modal ────────────────────────────────────────────
+
+function BlankDetailModal({
+  blank,
+  onClose,
+}: {
+  blank: ProviderProduct;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-surface-container rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-8 space-y-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold font-headline">{blank.name}</h2>
+              {blank.brand && (
+                <p className="text-sm text-on-surface-variant">{blank.brand}</p>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              className="w-10 h-10 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <div className="flex gap-6 flex-col sm:flex-row">
+            <div className="w-full sm:w-52 h-52 rounded-2xl bg-surface-container-highest flex items-center justify-center overflow-hidden">
+              {Object.values(blank.blankImages)[0] ? (
+                <img
+                  src={Object.values(blank.blankImages)[0]}
+                  alt={blank.name}
+                  className="w-full h-full object-contain p-4"
+                />
+              ) : (
+                <span className="material-symbols-outlined text-5xl text-on-surface-variant/40">
+                  checkroom
+                </span>
+              )}
+            </div>
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-3 py-1 rounded-full bg-[#6366F1]/10 text-[#6366F1] text-xs font-bold uppercase">
+                  {blank.productType}
+                </span>
+                <span className="font-mono font-bold text-2xl">
+                  ${blank.baseCost.toFixed(2)}
+                </span>
+              </div>
+              <p className="text-xs text-on-surface-variant font-mono">
+                Production: {blank.productionDays} day
+                {blank.productionDays !== 1 ? "s" : ""}
+              </p>
+              {blank.weightGrams && (
+                <p className="text-xs text-on-surface-variant font-mono">
+                  Weight: {blank.weightGrams}g
+                </p>
+              )}
+              {blank.description && (
+                <p className="text-sm text-on-surface-variant">
+                  {blank.description}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {blank.printAreas.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-3">
+                Print Areas
+              </h3>
+              <div className="flex gap-2 flex-wrap">
+                {blank.printAreas.map((pa) => (
+                  <div
+                    key={pa.name}
+                    className="bg-surface-container-low px-3 py-2 rounded-xl text-xs"
+                  >
+                    <span className="font-bold">{pa.name}</span>
+                    <span className="text-on-surface-variant ml-2 font-mono">
+                      {pa.widthPx}×{pa.heightPx}px @ {pa.dpi}dpi
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(blank.variants?.length ?? 0) > 0 && (
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-3">
+                Variants ({blank.variants?.length})
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-on-surface-variant text-[10px] uppercase tracking-[0.1em]">
+                      <th className="px-4 py-2 text-left">Size</th>
+                      <th className="px-4 py-2 text-left">Color</th>
+                      <th className="px-4 py-2 text-left font-mono">SKU</th>
+                      <th className="px-4 py-2 text-right">+Cost</th>
+                      <th className="px-4 py-2">Stock</th>
+                    </tr>
+                  </thead>
+                  <tbody className="font-headline">
+                    {blank.variants?.map((v) => (
+                      <tr
+                        key={v.id}
+                        className="hover:bg-surface-bright transition-colors"
+                      >
+                        <td className="px-4 py-2">{v.size}</td>
+                        <td className="px-4 py-2 text-on-surface-variant">
+                          {v.color}
+                        </td>
+                        <td className="px-4 py-2 font-mono text-xs text-on-surface-variant">
+                          {v.sku}
+                        </td>
+                        <td className="px-4 py-2 font-mono text-right">
+                          {v.additionalCost > 0
+                            ? `+$${v.additionalCost.toFixed(2)}`
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          {v.inStock ? (
+                            <span className="text-green-400 text-[10px] font-bold">
+                              IN
+                            </span>
+                          ) : (
+                            <span className="text-red-400 text-[10px] font-bold">
+                              OUT
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 justify-end pt-4">
+            <Button variant="secondary" onClick={onClose}>
+              Close
+            </Button>
+            <LinkButton
+              to={`/products/new?blank=${blank.id}`}
+              icon="add"
+            >
+              Create Product With This
+            </LinkButton>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
