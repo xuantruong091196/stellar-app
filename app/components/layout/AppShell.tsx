@@ -121,21 +121,6 @@ export function AppShell({
 
       {/* ─── SideNavBar ─────────────────────────────── */}
       <aside className="hidden lg:flex flex-col py-8 h-screen w-64 fixed left-0 top-0 bg-[#121317] z-40">
-        <div className="px-6 mb-12 mt-16">
-          <div className="flex items-center gap-3 mb-6">
-            <img
-              src="/images/logo.png"
-              alt="Stelo logo"
-              className="w-10 h-10 rounded-xl object-contain"
-            />
-            <div>
-              <h3 className="text-sm font-bold text-on-surface uppercase tracking-wider">
-                Mission Control
-              </h3>
-              <p className="text-[10px] text-primary">Stellar Network</p>
-            </div>
-          </div>
-        </div>
         <nav className="flex-1 px-4 space-y-2 font-headline text-sm">
           {NAV_ITEMS.map((item) => {
             const isActive = item.match
