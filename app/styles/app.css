@@ -1,29 +1,85 @@
-/* StellarPOD App - Global Styles */
-/* Polaris handles most styling. These are minimal overrides and utilities. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════
+   StellarPOD — "Celestial Mission Control"
+   Global overrides & utility classes
+   ═══════════════════════════════════════════════ */
 
 html,
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI",
-    Roboto, "Helvetica Neue", sans-serif;
-  background-color: #f6f6f7;
+  font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #121317;
+  color: #e3e2e8;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Ensure the app fills the viewport within Shopify admin */
-#root {
-  min-height: 100vh;
+html {
+  color-scheme: dark;
 }
 
-/* Utility for page-level spacing inside Shopify admin iframe */
-.stellarpod-page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 1rem;
+/* Signature gradients */
+.stellar-gradient {
+  background: linear-gradient(135deg, #0b1e3f 0%, #6366f1 50%, #22d3ee 100%);
 }
 
-/* Image thumbnails in design cards */
-img {
-  max-width: 100%;
-  height: auto;
+.stellar-text-gradient {
+  background: linear-gradient(135deg, #6366f1 0%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
+
+/* Glassmorphism */
+.glass-panel {
+  background: rgba(31, 31, 36, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Material Symbols icon fine-tuning */
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  user-select: none;
+}
+
+/* Scrollbar theme */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #121317;
+}
+::-webkit-scrollbar-thumb {
+  background: #343439;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #464554;
+}
+
+/* "Ghost" input — bottom-border only, gradient on focus */
+.ghost-input {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(70, 69, 84, 0.5);
+  border-radius: 0;
+  padding: 0.75rem 0;
+  color: #e3e2e8;
+  width: 100%;
+  transition: border-color 200ms ease;
+}
+.ghost-input:focus {
+  outline: none;
+  border-image: linear-gradient(90deg, #6366f1, #22d3ee) 1;
+  border-bottom-width: 2px;
+}
+.ghost-input::placeholder {
+  color: #7a7a85;
+}
+
+/* Shopify polaris Frame override removed — we use custom layout */

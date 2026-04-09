@@ -23,6 +23,8 @@ export async function api<T = unknown>(
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    // Dev mode bypass — auto-create a demo store in BE
+    "X-Dev-Store": "demo-store",
     ...customHeaders,
   };
 

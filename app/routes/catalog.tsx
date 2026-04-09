@@ -1,39 +1,23 @@
 import { useState, useCallback } from "react";
-import {
-  Page,
-  Layout,
-  Card,
-  Badge,
-  Select,
-  InlineGrid,
-  Text,
-  BlockStack,
-  InlineStack,
-  Banner,
-  Button,
-  Thumbnail,
-  Box,
-  Modal,
-  DataTable,
-  Divider,
-} from "@shopify/polaris";
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, useSearchParams, useNavigate } from "@remix-run/react";
+import { useLoaderData, useSearchParams } from "@remix-run/react";
 import { apiGet } from "~/lib/api";
 import type { ProviderProduct, PaginatedResponse } from "~/lib/types";
+import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
+import { Button, LinkButton } from "~/components/ui/Button";
 
-export const meta: MetaFunction = () => {
-  return [{ title: "StellarPOD - Product Catalog" }];
-};
+export const meta: MetaFunction = () => [
+  { title: "StellarPOD — Catalog" },
+];
 
-const PRODUCT_TYPE_OPTIONS = [
-  { label: "All Types", value: "" },
-  { label: "T-Shirt", value: "T-Shirt" },
-  { label: "Hoodie", value: "Hoodie" },
-  { label: "Mug", value: "Mug" },
-  { label: "Poster", value: "Poster" },
-  { label: "Tote Bag", value: "Tote Bag" },
+const PRODUCT_TYPES = [
+  "",
+  "T-Shirt",
+  "Hoodie",
+  "Mug",
+  "Poster",
+  "Tote Bag",
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -42,35 +26,30 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const page = url.searchParams.get("page") || "1";
 
   let endpoint = `/provider-products?page=${page}&limit=20`;
-  if (productType) {
-    endpoint += `&productType=${encodeURIComponent(productType)}`;
-  }
+  if (productType) endpoint += `&productType=${encodeURIComponent(productType)}`;
 
   const res = await apiGet<PaginatedResponse<ProviderProduct>>(endpoint);
-
   return json({
-    products: res.data?.data ?? (res.data as unknown as ProviderProduct[]) ?? [],
+    products:
+      res.data?.data ?? (res.data as unknown as ProviderProduct[]) ?? [],
     meta: res.data?.meta ?? { total: 0, page: 1, limit: 20, totalPages: 1 },
     error: res.error,
   });
 }
 
 export default function Catalog() {
-  const navigate = useNavigate();
-  const { products, meta: pagination, error } = useLoaderData<typeof loader>();
+  const { products, meta: pagination, error } =
+    useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedProduct, setSelectedProduct] = useState<ProviderProduct | null>(null);
+  const [selected, setSelected] = useState<ProviderProduct | null>(null);
 
   const currentType = searchParams.get("productType") || "";
 
-  const handleTypeChange = useCallback(
+  const handleType = useCallback(
     (value: string) => {
       setSearchParams((prev) => {
-        if (value) {
-          prev.set("productType", value);
-        } else {
-          prev.delete("productType");
-        }
+        if (value) prev.set("productType", value);
+        else prev.delete("productType");
         prev.set("page", "1");
         return prev;
       });
@@ -78,310 +57,326 @@ export default function Catalog() {
     [setSearchParams],
   );
 
-  const uniqueSizes = selectedProduct?.variants
-    ? [...new Set(selectedProduct.variants.map((v) => v.size))]
-    : [];
-
-  const uniqueColors = selectedProduct?.variants
-    ? [...new Set(selectedProduct.variants.map((v) => v.color))]
-    : [];
-
-  const sizeChartRows = selectedProduct?.sizeChart
-    ? Object.entries(selectedProduct.sizeChart).map(([size, measurements]) => [
-        size,
-        ...Object.values(measurements).map((v) => `${v}`),
-      ])
-    : [];
-
-  const sizeChartHeadings = selectedProduct?.sizeChart
-    ? [
-        "Size",
-        ...Object.keys(Object.values(selectedProduct.sizeChart)[0] || {}),
-      ]
-    : [];
-
   return (
-    <Page title="Product Catalog" subtitle="Browse available products from providers">
-      <BlockStack gap="400">
-        {error && (
-          <Banner title="Error loading catalog" tone="critical">
-            <p>{error}</p>
-          </Banner>
-        )}
+    <>
+      <PageHeader
+        title="Product Catalog"
+        subtitle="Browse blanks from all connected providers"
+        actions={
+          <LinkButton to="/products/new" icon="add">
+            Start a Product
+          </LinkButton>
+        }
+      />
 
-        <Card>
-          <InlineStack gap="400" blockAlign="center">
-            <div style={{ minWidth: "200px" }}>
-              <Select
-                label="Product Type"
-                labelInline
-                options={PRODUCT_TYPE_OPTIONS}
-                value={currentType}
-                onChange={handleTypeChange}
-              />
-            </div>
-            <Text as="span" variant="bodySm" tone="subdued">
-              {pagination.total} product{pagination.total !== 1 ? "s" : ""} found
-            </Text>
-          </InlineStack>
-        </Card>
+      {error && (
+        <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-6 py-4 rounded-2xl">
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
 
-        {products.length === 0 ? (
-          <Card>
-            <Text as="p" tone="subdued">
-              No products found for the selected filter.
-            </Text>
-          </Card>
-        ) : (
-          <InlineGrid columns={{ xs: 1, sm: 2, md: 3, lg: 4 }} gap="400">
-            {products.map((pp) => {
-              const variantSizes = pp.variants
-                ? [...new Set(pp.variants.map((v) => v.size))]
-                : [];
-              const variantColors = pp.variants
-                ? [...new Set(pp.variants.map((v) => v.color))]
-                : [];
+      {/* Filter Chips */}
+      <section className="bg-surface-container-low rounded-2xl p-6">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant mr-2">
+            Filter:
+          </span>
+          {PRODUCT_TYPES.map((type) => {
+            const label = type || "All Types";
+            const active = currentType === type;
+            return (
+              <button
+                key={label}
+                onClick={() => handleType(type)}
+                className={
+                  active
+                    ? "stellar-gradient text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider"
+                    : "bg-surface-container-high text-on-surface-variant hover:text-on-surface px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors"
+                }
+              >
+                {label}
+              </button>
+            );
+          })}
+          <span className="ml-auto text-xs text-on-surface-variant font-mono">
+            {pagination.total} result{pagination.total !== 1 ? "s" : ""}
+          </span>
+        </div>
+      </section>
 
-              return (
-                <div
-                  key={pp.id}
-                  onClick={() => setSelectedProduct(pp)}
-                  style={{ cursor: "pointer" }}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      setSelectedProduct(pp);
-                    }
-                  }}
-                >
-                  <Card>
-                    <BlockStack gap="300">
-                      <Box
-                        background="bg-surface-secondary"
-                        borderRadius="200"
-                        padding="400"
-                        minHeight="100px"
-                      >
-                        <InlineStack align="center">
-                          <Thumbnail
-                            source={
-                              Object.values(pp.blankImages)[0] ||
-                              "/images/placeholder-design.png"
-                            }
-                            alt={pp.name}
-                            size="large"
-                          />
-                        </InlineStack>
-                      </Box>
-                      <Text as="h3" variant="headingSm" truncate>
-                        {pp.name}
-                      </Text>
-                      {pp.brand && (
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          {pp.brand}
-                        </Text>
-                      )}
-                      <InlineStack gap="200" blockAlign="center">
-                        <Badge>{pp.productType}</Badge>
-                        <Text as="span" variant="bodyMd" fontWeight="bold">
-                          ${pp.baseCost.toFixed(2)}
-                        </Text>
-                      </InlineStack>
-                      {variantSizes.length > 0 && (
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Sizes: {variantSizes.join(", ")}
-                        </Text>
-                      )}
-                      {variantColors.length > 0 && (
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Colors: {variantColors.length} available
-                        </Text>
-                      )}
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        {pp.productionDays} day{pp.productionDays !== 1 ? "s" : ""} production
-                      </Text>
-                    </BlockStack>
-                  </Card>
+      {/* Products Grid */}
+      {products.length === 0 ? (
+        <section className="bg-surface-container-low rounded-2xl">
+          <EmptyState
+            icon="storefront"
+            title="No products found"
+            description="Try adjusting your filter or connecting more providers."
+          />
+        </section>
+      ) : (
+        <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {products.map((pp) => {
+            const img = Object.values(pp.blankImages)[0];
+            const sizes = pp.variants
+              ? [...new Set(pp.variants.map((v) => v.size))]
+              : [];
+            const colors = pp.variants
+              ? [...new Set(pp.variants.map((v) => v.color))]
+              : [];
+            return (
+              <button
+                key={pp.id}
+                onClick={() => setSelected(pp)}
+                className="bg-surface-container-low hover:bg-surface-container-high transition-colors p-4 rounded-2xl text-left group"
+              >
+                <div className="w-full h-44 rounded-xl bg-surface-container-highest mb-4 flex items-center justify-center overflow-hidden">
+                  {img ? (
+                    <img
+                      src={img}
+                      alt={pp.name}
+                      className="w-full h-full object-contain p-4"
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">
+                      checkroom
+                    </span>
+                  )}
                 </div>
-              );
-            })}
-          </InlineGrid>
-        )}
-
-        {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <Card>
-            <InlineStack align="space-between">
-              <Text as="span" variant="bodySm" tone="subdued">
-                Page {pagination.page} of {pagination.totalPages}
-              </Text>
-              <InlineStack gap="200">
-                {pagination.page > 1 && (
-                  <Button
-                    size="slim"
-                    onClick={() =>
-                      setSearchParams((prev) => {
-                        prev.set("page", String(pagination.page - 1));
-                        return prev;
-                      })
-                    }
-                  >
-                    Previous
-                  </Button>
+                <h3 className="font-bold mb-1 group-hover:text-primary transition-colors truncate">
+                  {pp.name}
+                </h3>
+                {pp.brand && (
+                  <p className="text-xs text-on-surface-variant">{pp.brand}</p>
                 )}
-                {pagination.page < pagination.totalPages && (
-                  <Button
-                    size="slim"
-                    onClick={() =>
-                      setSearchParams((prev) => {
-                        prev.set("page", String(pagination.page + 1));
-                        return prev;
-                      })
-                    }
-                  >
-                    Next
-                  </Button>
-                )}
-              </InlineStack>
-            </InlineStack>
-          </Card>
-        )}
+                <div className="flex items-center justify-between mt-3">
+                  <span className="px-2 py-0.5 rounded-full bg-[#6366F1]/10 text-[#6366F1] text-[10px] font-bold uppercase">
+                    {pp.productType}
+                  </span>
+                  <span className="font-mono font-bold">
+                    ${pp.baseCost.toFixed(2)}
+                  </span>
+                </div>
+                <div className="mt-3 space-y-1">
+                  {sizes.length > 0 && (
+                    <p className="text-[10px] text-on-surface-variant">
+                      Sizes: {sizes.slice(0, 5).join(", ")}
+                      {sizes.length > 5 && "…"}
+                    </p>
+                  )}
+                  {colors.length > 0 && (
+                    <p className="text-[10px] text-on-surface-variant">
+                      {colors.length} colors available
+                    </p>
+                  )}
+                  <p className="text-[10px] text-on-surface-variant">
+                    {pp.productionDays} day
+                    {pp.productionDays !== 1 ? "s" : ""} production
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </section>
+      )}
 
-        {/* Product Detail Modal */}
-        {selectedProduct && (
-          <Modal
-            open={!!selectedProduct}
-            onClose={() => setSelectedProduct(null)}
-            title={selectedProduct.name}
-            primaryAction={{
-              content: "Create Product with This",
-              onAction: () => navigate("/products/new"),
-            }}
-            secondaryActions={[
-              { content: "Close", onAction: () => setSelectedProduct(null) },
-            ]}
-            size="large"
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <section className="bg-surface-container-low rounded-2xl px-6 py-4 flex items-center justify-between">
+          <span className="text-sm text-on-surface-variant">
+            Page {pagination.page} / {pagination.totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            {pagination.page > 1 && (
+              <Button
+                variant="secondary"
+                className="!py-2"
+                onClick={() =>
+                  setSearchParams((prev) => {
+                    prev.set("page", String(pagination.page - 1));
+                    return prev;
+                  })
+                }
+              >
+                Previous
+              </Button>
+            )}
+            {pagination.page < pagination.totalPages && (
+              <Button
+                variant="secondary"
+                className="!py-2"
+                onClick={() =>
+                  setSearchParams((prev) => {
+                    prev.set("page", String(pagination.page + 1));
+                    return prev;
+                  })
+                }
+              >
+                Next
+              </Button>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Detail Modal */}
+      {selected && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="bg-surface-container rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
           >
-            <Modal.Section>
-              <BlockStack gap="400">
-                <InlineStack gap="400" blockAlign="start">
-                  <Thumbnail
-                    source={
-                      Object.values(selectedProduct.blankImages)[0] ||
-                      "/images/placeholder-design.png"
-                    }
-                    alt={selectedProduct.name}
-                    size="large"
-                  />
-                  <BlockStack gap="200">
-                    <Text as="h3" variant="headingMd">{selectedProduct.name}</Text>
-                    {selectedProduct.brand && (
-                      <Text as="p" variant="bodyMd">Brand: {selectedProduct.brand}</Text>
-                    )}
-                    <InlineStack gap="200">
-                      <Badge>{selectedProduct.productType}</Badge>
-                      <Text as="span" variant="bodyMd" fontWeight="bold">
-                        ${selectedProduct.baseCost.toFixed(2)}
-                      </Text>
-                    </InlineStack>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Production: {selectedProduct.productionDays} day
-                      {selectedProduct.productionDays !== 1 ? "s" : ""}
-                    </Text>
-                    {selectedProduct.weightGrams && (
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Weight: {selectedProduct.weightGrams}g
-                      </Text>
-                    )}
-                    {selectedProduct.description && (
-                      <Text as="p" variant="bodyMd">{selectedProduct.description}</Text>
-                    )}
-                  </BlockStack>
-                </InlineStack>
+            <div className="p-8 space-y-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold font-headline">
+                    {selected.name}
+                  </h2>
+                  {selected.brand && (
+                    <p className="text-sm text-on-surface-variant">
+                      {selected.brand}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setSelected(null)}
+                  className="w-10 h-10 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
 
-                {/* Print Areas */}
-                {selectedProduct.printAreas.length > 0 && (
-                  <>
-                    <Divider />
-                    <Text as="h3" variant="headingSm">Print Areas</Text>
-                    {selectedProduct.printAreas.map((pa) => (
-                      <InlineStack key={pa.name} gap="200">
-                        <Badge>{pa.name}</Badge>
-                        <Text as="span" variant="bodySm">
-                          {pa.widthPx} x {pa.heightPx}px @ {pa.dpi}dpi
-                        </Text>
-                      </InlineStack>
+              <div className="flex gap-6 flex-col sm:flex-row">
+                <div className="w-full sm:w-52 h-52 rounded-2xl bg-surface-container-highest flex items-center justify-center overflow-hidden">
+                  {Object.values(selected.blankImages)[0] ? (
+                    <img
+                      src={Object.values(selected.blankImages)[0]}
+                      alt={selected.name}
+                      className="w-full h-full object-contain p-4"
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined text-5xl text-on-surface-variant/40">
+                      checkroom
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-3 py-1 rounded-full bg-[#6366F1]/10 text-[#6366F1] text-xs font-bold uppercase">
+                      {selected.productType}
+                    </span>
+                    <span className="font-mono font-bold text-2xl">
+                      ${selected.baseCost.toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-on-surface-variant font-mono">
+                    Production: {selected.productionDays} day
+                    {selected.productionDays !== 1 ? "s" : ""}
+                  </p>
+                  {selected.weightGrams && (
+                    <p className="text-xs text-on-surface-variant font-mono">
+                      Weight: {selected.weightGrams}g
+                    </p>
+                  )}
+                  {selected.description && (
+                    <p className="text-sm text-on-surface-variant">
+                      {selected.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {selected.printAreas.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-3">
+                    Print Areas
+                  </h3>
+                  <div className="flex gap-2 flex-wrap">
+                    {selected.printAreas.map((pa) => (
+                      <div
+                        key={pa.name}
+                        className="bg-surface-container-low px-3 py-2 rounded-xl text-xs"
+                      >
+                        <span className="font-bold">{pa.name}</span>
+                        <span className="text-on-surface-variant ml-2 font-mono">
+                          {pa.widthPx}×{pa.heightPx}px @ {pa.dpi}dpi
+                        </span>
+                      </div>
                     ))}
-                  </>
-                )}
+                  </div>
+                </div>
+              )}
 
-                {/* Available Sizes & Colors */}
-                {(uniqueSizes.length > 0 || uniqueColors.length > 0) && (
-                  <>
-                    <Divider />
-                    <Text as="h3" variant="headingSm">Available Options</Text>
-                    {uniqueSizes.length > 0 && (
-                      <InlineStack gap="100" wrap>
-                        <Text as="span" variant="bodyMd" fontWeight="bold">
-                          Sizes:
-                        </Text>
-                        {uniqueSizes.map((s) => (
-                          <Badge key={s}>{s}</Badge>
+              {(selected.variants?.length ?? 0) > 0 && (
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-3">
+                    Variants ({selected.variants?.length})
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-on-surface-variant text-[10px] uppercase tracking-[0.1em]">
+                          <th className="px-4 py-2 text-left">Size</th>
+                          <th className="px-4 py-2 text-left">Color</th>
+                          <th className="px-4 py-2 text-left font-mono">SKU</th>
+                          <th className="px-4 py-2 text-right">+Cost</th>
+                          <th className="px-4 py-2">Stock</th>
+                        </tr>
+                      </thead>
+                      <tbody className="font-headline">
+                        {selected.variants?.map((v) => (
+                          <tr
+                            key={v.id}
+                            className="hover:bg-surface-bright transition-colors"
+                          >
+                            <td className="px-4 py-2">{v.size}</td>
+                            <td className="px-4 py-2 text-on-surface-variant">
+                              {v.color}
+                            </td>
+                            <td className="px-4 py-2 font-mono text-xs text-on-surface-variant">
+                              {v.sku}
+                            </td>
+                            <td className="px-4 py-2 font-mono text-right">
+                              {v.additionalCost > 0
+                                ? `+$${v.additionalCost.toFixed(2)}`
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              {v.inStock ? (
+                                <span className="text-green-400 text-[10px] font-bold">
+                                  IN
+                                </span>
+                              ) : (
+                                <span className="text-red-400 text-[10px] font-bold">
+                                  OUT
+                                </span>
+                              )}
+                            </td>
+                          </tr>
                         ))}
-                      </InlineStack>
-                    )}
-                    {uniqueColors.length > 0 && (
-                      <InlineStack gap="100" wrap>
-                        <Text as="span" variant="bodyMd" fontWeight="bold">
-                          Colors:
-                        </Text>
-                        {uniqueColors.map((c) => (
-                          <Badge key={c}>{c}</Badge>
-                        ))}
-                      </InlineStack>
-                    )}
-                  </>
-                )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
-                {/* Size Chart */}
-                {sizeChartRows.length > 0 && (
-                  <>
-                    <Divider />
-                    <Text as="h3" variant="headingSm">Size Chart</Text>
-                    <DataTable
-                      columnContentTypes={sizeChartHeadings.map(() => "text" as const)}
-                      headings={sizeChartHeadings}
-                      rows={sizeChartRows}
-                    />
-                  </>
-                )}
-
-                {/* All Variants */}
-                {selectedProduct.variants && selectedProduct.variants.length > 0 && (
-                  <>
-                    <Divider />
-                    <Text as="h3" variant="headingSm">
-                      All Variants ({selectedProduct.variants.length})
-                    </Text>
-                    <DataTable
-                      columnContentTypes={["text", "text", "text", "numeric", "text"]}
-                      headings={["Size", "Color", "SKU", "Extra Cost", "Stock"]}
-                      rows={selectedProduct.variants.map((v) => [
-                        v.size,
-                        v.color,
-                        v.sku,
-                        v.additionalCost > 0 ? `+$${v.additionalCost.toFixed(2)}` : "$0.00",
-                        v.inStock ? "In Stock" : "Out of Stock",
-                      ])}
-                    />
-                  </>
-                )}
-              </BlockStack>
-            </Modal.Section>
-          </Modal>
-        )}
-      </BlockStack>
-    </Page>
+              <div className="flex items-center gap-3 justify-end pt-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => setSelected(null)}
+                >
+                  Close
+                </Button>
+                <LinkButton to="/products/new" icon="add">
+                  Create Product With This
+                </LinkButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

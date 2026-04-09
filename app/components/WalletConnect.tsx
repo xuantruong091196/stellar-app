@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Button, Badge, BlockStack, InlineStack, Text, Banner } from "@shopify/polaris";
+import { Button } from "~/components/ui/Button";
 
 interface WalletState {
   connected: boolean;
@@ -13,7 +13,9 @@ interface WalletConnectProps {
   onAddressChange?: (address: string | null) => void;
 }
 
-export function WalletConnect({ onAddressChange }: WalletConnectProps = {}) {
+export function WalletConnect({
+  onAddressChange,
+}: WalletConnectProps = {}) {
   const [wallet, setWallet] = useState<WalletState>({
     connected: false,
     address: null,
@@ -24,13 +26,10 @@ export function WalletConnect({ onAddressChange }: WalletConnectProps = {}) {
 
   const handleConnect = useCallback(async () => {
     setWallet((prev) => ({ ...prev, loading: true, error: null }));
-
     try {
-      // Dynamic import to avoid SSR issues with Freighter
       const { connectWallet, getBalance } = await import("~/lib/stellar");
       const walletInfo = await connectWallet();
       const balance = await getBalance(walletInfo.address);
-
       setWallet({
         connected: true,
         address: walletInfo.address,
@@ -46,7 +45,7 @@ export function WalletConnect({ onAddressChange }: WalletConnectProps = {}) {
         error: err instanceof Error ? err.message : "Failed to connect wallet",
       }));
     }
-  }, []);
+  }, [onAddressChange]);
 
   const handleDisconnect = useCallback(() => {
     setWallet({
@@ -59,58 +58,77 @@ export function WalletConnect({ onAddressChange }: WalletConnectProps = {}) {
     onAddressChange?.(null);
   }, [onAddressChange]);
 
-  const truncateAddress = (addr: string) =>
+  const truncate = (addr: string) =>
     `${addr.slice(0, 6)}...${addr.slice(-6)}`;
 
-  return (
-    <BlockStack gap="300">
-      {wallet.error && (
-        <Banner tone="critical" onDismiss={() => setWallet((prev) => ({ ...prev, error: null }))}>
-          <p>{wallet.error}</p>
-        </Banner>
-      )}
+  if (wallet.error) {
+    return (
+      <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-4 py-3 rounded-2xl">
+        <p className="text-sm">{wallet.error}</p>
+        <button
+          type="button"
+          onClick={() =>
+            setWallet((prev) => ({ ...prev, error: null }))
+          }
+          className="text-xs underline mt-1"
+        >
+          Dismiss
+        </button>
+      </div>
+    );
+  }
 
-      {wallet.connected && wallet.address ? (
-        <BlockStack gap="300">
-          <InlineStack align="space-between" blockAlign="center">
-            <InlineStack gap="200" blockAlign="center">
-              <Badge tone="success">Connected</Badge>
-              <Text as="span" variant="bodyMd" fontWeight="semibold">
-                {truncateAddress(wallet.address)}
-              </Text>
-            </InlineStack>
-            <Button variant="plain" tone="critical" onClick={handleDisconnect}>
-              Disconnect
-            </Button>
-          </InlineStack>
-
+  if (wallet.connected && wallet.address) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-surface-container p-5 rounded-2xl stellar-gradient">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-white/60 font-bold">
+                Connected Wallet
+              </p>
+              <p className="font-mono text-white text-lg font-bold mt-1">
+                {truncate(wallet.address)}
+              </p>
+            </div>
+            <span className="bg-white/20 text-white text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border border-white/30">
+              Active
+            </span>
+          </div>
           {wallet.balance !== null && (
-            <InlineStack gap="200" blockAlign="center">
-              <Text as="span" variant="bodySm" tone="subdued">Balance:</Text>
-              <Text as="span" variant="bodyMd" fontWeight="bold">
-                {wallet.balance} USDC
-              </Text>
-            </InlineStack>
+            <p className="text-white font-mono font-bold text-2xl mt-3">
+              {wallet.balance}{" "}
+              <span className="text-cyan-200 text-sm">USDC</span>
+            </p>
           )}
+          <p className="text-white/60 text-[10px] font-mono mt-2 break-all">
+            {wallet.address}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleDisconnect}
+          className="text-xs font-bold text-red-400 hover:underline"
+        >
+          Disconnect Wallet
+        </button>
+      </div>
+    );
+  }
 
-          <Text as="p" variant="bodySm" tone="subdued">
-            Full address: {wallet.address}
-          </Text>
-        </BlockStack>
-      ) : (
-        <BlockStack gap="200">
-          <Button
-            variant="primary"
-            onClick={handleConnect}
-            loading={wallet.loading}
-          >
-            Connect Freighter Wallet
-          </Button>
-          <Text as="p" variant="bodySm" tone="subdued">
-            Connect your Stellar wallet using the Freighter browser extension.
-          </Text>
-        </BlockStack>
-      )}
-    </BlockStack>
+  return (
+    <div className="space-y-3">
+      <Button
+        type="button"
+        onClick={handleConnect}
+        disabled={wallet.loading}
+        icon="account_balance_wallet"
+      >
+        {wallet.loading ? "Connecting..." : "Connect Freighter Wallet"}
+      </Button>
+      <p className="text-xs text-on-surface-variant">
+        Connect your Stellar wallet using the Freighter browser extension.
+      </p>
+    </div>
   );
 }

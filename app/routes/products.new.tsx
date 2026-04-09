@@ -1,26 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import {
-  Page,
-  Layout,
-  Card,
-  FormLayout,
-  TextField,
-  Select,
-  Badge,
-  InlineGrid,
-  Thumbnail,
-  ProgressBar,
-  Banner,
-  Button,
-  BlockStack,
-  InlineStack,
-  Text,
-  Box,
-  Divider,
-} from "@shopify/polaris";
 import type { ActionFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useFetcher, useNavigate } from "@remix-run/react";
+import { useFetcher, useNavigate, Link } from "@remix-run/react";
 import { apiGet, apiPost } from "~/lib/api";
 import type {
   ProviderProduct,
@@ -30,10 +11,12 @@ import type {
   MerchantProduct,
   PaginatedResponse,
 } from "~/lib/types";
+import { PageHeader } from "~/components/ui/PageHeader";
+import { Button, LinkButton } from "~/components/ui/Button";
 
-export const meta: MetaFunction = () => {
-  return [{ title: "StellarPOD - Create Product" }];
-};
+export const meta: MetaFunction = () => [
+  { title: "StellarPOD — Create Product" },
+];
 
 const STORE_ID = "demo-store";
 
@@ -75,21 +58,24 @@ export async function action({ request }: ActionFunctionArgs) {
       printConfig,
     });
 
-    if (result.error) {
+    if (result.error)
       return json({ error: result.error }, { status: result.status || 500 });
-    }
 
-    return json({ success: true, product: result.data, intent: "create-draft" });
+    return json({
+      success: true,
+      product: result.data,
+      intent: "create-draft",
+    });
   }
 
   if (intent === "publish") {
     const productId = formData.get("productId") as string;
-    if (!productId) return json({ error: "Missing productId" }, { status: 400 });
+    if (!productId)
+      return json({ error: "Missing productId" }, { status: 400 });
 
     const result = await apiPost(`/products/${productId}/publish`, {});
-    if (result.error) {
+    if (result.error)
       return json({ error: result.error }, { status: result.status || 500 });
-    }
 
     return json({ success: true, intent: "publish" });
   }
@@ -99,12 +85,20 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function CreateProduct() {
   const navigate = useNavigate();
-  const fetcher = useFetcher();
+  const fetcher = useFetcher<{
+    success?: boolean;
+    error?: string;
+    product?: MerchantProduct;
+    intent?: string;
+  }>();
 
   const [step, setStep] = useState(0);
-  const [providerProducts, setProviderProducts] = useState<ProviderProduct[]>([]);
+  const [providerProducts, setProviderProducts] = useState<ProviderProduct[]>(
+    [],
+  );
   const [designs, setDesigns] = useState<Design[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<ProviderProduct | null>(null);
+  const [selectedProduct, setSelectedProduct] =
+    useState<ProviderProduct | null>(null);
   const [selectedDesign, setSelectedDesign] = useState<Design | null>(null);
   const [title, setTitle] = useState("");
   const [retailPrice, setRetailPrice] = useState("");
@@ -118,24 +112,24 @@ export default function CreateProduct() {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load catalog on mount
   useEffect(() => {
     async function loadCatalog() {
       setLoadingCatalog(true);
       const res = await apiGet<PaginatedResponse<ProviderProduct>>(
         "/provider-products?isActive=true&limit=50",
       );
-      if (res.error) {
-        setLoadError(res.error);
-      } else {
-        setProviderProducts(res.data?.data ?? (res.data as unknown as ProviderProduct[]) ?? []);
-      }
+      if (res.error) setLoadError(res.error);
+      else
+        setProviderProducts(
+          res.data?.data ??
+            (res.data as unknown as ProviderProduct[]) ??
+            [],
+        );
       setLoadingCatalog(false);
     }
     loadCatalog();
   }, []);
 
-  // Load designs when moving to step 2
   useEffect(() => {
     if (step === 1 && designs.length === 0) {
       async function loadDesigns() {
@@ -143,18 +137,17 @@ export default function CreateProduct() {
         const res = await apiGet<PaginatedResponse<Design>>(
           `/designs/${STORE_ID}?limit=50`,
         );
-        if (res.error) {
-          setLoadError(res.error);
-        } else {
-          setDesigns(res.data?.data ?? (res.data as unknown as Design[]) ?? []);
-        }
+        if (res.error) setLoadError(res.error);
+        else
+          setDesigns(
+            res.data?.data ?? (res.data as unknown as Design[]) ?? [],
+          );
         setLoadingDesigns(false);
       }
       loadDesigns();
     }
   }, [step, designs.length]);
 
-  // Set defaults when product is selected
   useEffect(() => {
     if (selectedProduct) {
       setTitle(selectedProduct.name);
@@ -164,17 +157,14 @@ export default function CreateProduct() {
     }
   }, [selectedProduct]);
 
-  // Debounced pricing fetch
   const fetchPricing = useCallback(
     (price: string) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-
       const numPrice = parseFloat(price);
       if (!selectedProduct || isNaN(numPrice) || numPrice <= 0) {
         setPricing(null);
         return;
       }
-
       setPricingLoading(true);
       debounceRef.current = setTimeout(async () => {
         const res = await apiGet<PricingBreakdown>(
@@ -183,11 +173,11 @@ export default function CreateProduct() {
         if (res.data) {
           setPricing(res.data);
         } else {
-          // Compute locally as fallback
           const baseCost = selectedProduct.baseCost;
           const platformFee = numPrice * 0.05;
           const profitMargin = numPrice - baseCost - platformFee;
-          const profitPercent = numPrice > 0 ? (profitMargin / numPrice) * 100 : 0;
+          const profitPercent =
+            numPrice > 0 ? (profitMargin / numPrice) * 100 : 0;
           setPricing({
             baseCost,
             retailPrice: numPrice,
@@ -204,534 +194,526 @@ export default function CreateProduct() {
   );
 
   const handleRetailPriceChange = useCallback(
-    (value: string) => {
-      setRetailPrice(value);
-      fetchPricing(value);
+    (v: string) => {
+      setRetailPrice(v);
+      fetchPricing(v);
     },
     [fetchPricing],
   );
 
-  // Handle fetcher response
   useEffect(() => {
-    const data = fetcher.data as {
-      success?: boolean;
-      error?: string;
-      product?: MerchantProduct;
-      intent?: string;
-    } | undefined;
-
-    if (data?.success && data.intent === "create-draft" && data.product) {
-      setCreatedProductId(data.product.id);
+    if (fetcher.data?.success && fetcher.data.intent === "create-draft" && fetcher.data.product) {
+      setCreatedProductId(fetcher.data.product.id);
       setStep(3);
     }
-
-    if (data?.success && data.intent === "publish") {
+    if (fetcher.data?.success && fetcher.data.intent === "publish") {
       navigate("/products");
     }
   }, [fetcher.data, navigate]);
 
-  const fetcherData = fetcher.data as { error?: string } | undefined;
   const isSubmitting = fetcher.state === "submitting";
-  const progressPercent = ((step + 1) / STEP_LABELS.length) * 100;
 
   return (
-    <Page
-      title="Create Product"
-      backAction={{ content: "Products", onAction: () => navigate("/products") }}
-    >
-      <BlockStack gap="400">
-        {/* Progress indicator */}
-        <Card>
-          <BlockStack gap="300">
-            <InlineStack align="space-between">
-              {STEP_LABELS.map((label, i) => (
-                <Text
-                  key={label}
-                  as="span"
-                  variant="bodySm"
-                  fontWeight={i === step ? "bold" : "regular"}
-                  tone={i <= step ? undefined : "subdued"}
+    <>
+      <div className="flex items-center gap-3 text-sm">
+        <Link
+          to="/products"
+          className="text-on-surface-variant hover:text-primary flex items-center gap-1"
+        >
+          <span className="material-symbols-outlined text-sm">arrow_back</span>
+          Products
+        </Link>
+        <span className="text-on-surface-variant/40">/</span>
+        <span className="text-on-surface-variant">Create Product</span>
+      </div>
+
+      <PageHeader
+        title="Create Product"
+        subtitle="Ship a new item to your Shopify store in 4 steps"
+      />
+
+      {/* Stepper */}
+      <section className="bg-surface-container-low rounded-2xl p-8">
+        <div className="flex items-center justify-between">
+          {STEP_LABELS.map((label, i) => {
+            const isActive = i === step;
+            const isDone = i < step;
+            return (
+              <div
+                key={label}
+                className="flex items-center gap-4 flex-1 last:flex-none"
+              >
+                <div
+                  className={
+                    isDone
+                      ? "w-10 h-10 rounded-full bg-green-500/20 text-green-400 border-2 border-green-400 flex items-center justify-center"
+                      : isActive
+                        ? "w-10 h-10 rounded-full stellar-gradient text-white flex items-center justify-center font-bold"
+                        : "w-10 h-10 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-bold"
+                  }
                 >
-                  {i + 1}. {label}
-                </Text>
-              ))}
-            </InlineStack>
-            <ProgressBar progress={progressPercent} size="small" />
-          </BlockStack>
-        </Card>
-
-        {fetcherData?.error && (
-          <Banner title="Error" tone="critical">
-            <p>{fetcherData.error}</p>
-          </Banner>
-        )}
-
-        {loadError && (
-          <Banner title="Error loading data" tone="critical">
-            <p>{loadError}</p>
-          </Banner>
-        )}
-
-        {/* Step 1: Choose Provider Product */}
-        {step === 0 && (
-          <Layout>
-            <Layout.Section>
-              <Card>
-                <BlockStack gap="400">
-                  <Text as="h2" variant="headingMd">
-                    Choose a Product from the Catalog
-                  </Text>
-                  {loadingCatalog ? (
-                    <Text as="p" tone="subdued">Loading catalog...</Text>
-                  ) : providerProducts.length === 0 ? (
-                    <Text as="p" tone="subdued">
-                      No active products found in the catalog.
-                    </Text>
+                  {isDone ? (
+                    <span className="material-symbols-outlined">check</span>
                   ) : (
-                    <InlineGrid columns={{ xs: 1, sm: 2, md: 3 }} gap="400">
-                      {providerProducts.map((pp) => (
-                        <div
-                          key={pp.id}
-                          onClick={() => {
-                            setSelectedProduct(pp);
-                            setStep(1);
-                          }}
-                          style={{ cursor: "pointer" }}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              setSelectedProduct(pp);
-                              setStep(1);
-                            }
-                          }}
-                        >
-                          <Card>
-                            <BlockStack gap="300">
-                              <Box
-                                background="bg-surface-secondary"
-                                borderRadius="200"
-                                padding="400"
-                                minHeight="80px"
-                              >
-                                <InlineStack align="center">
-                                  <Thumbnail
-                                    source={
-                                      Object.values(pp.blankImages)[0] ||
-                                      "/images/placeholder-design.png"
-                                    }
-                                    alt={pp.name}
-                                    size="large"
-                                  />
-                                </InlineStack>
-                              </Box>
-                              <Text as="h3" variant="headingSm" truncate>
-                                {pp.name}
-                              </Text>
-                              {pp.brand && (
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  {pp.brand}
-                                </Text>
-                              )}
-                              <InlineStack gap="200" blockAlign="center">
-                                <Badge>{pp.productType}</Badge>
-                                <Text as="span" variant="bodySm" fontWeight="bold">
-                                  ${pp.baseCost.toFixed(2)}
-                                </Text>
-                              </InlineStack>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {pp.productionDays} day{pp.productionDays !== 1 ? "s" : ""}{" "}
-                                production
-                              </Text>
-                            </BlockStack>
-                          </Card>
-                        </div>
-                      ))}
-                    </InlineGrid>
+                    i + 1
                   )}
-                </BlockStack>
-              </Card>
-            </Layout.Section>
-          </Layout>
-        )}
+                </div>
+                <span
+                  className={`hidden md:inline text-sm font-bold ${
+                    isActive
+                      ? "text-on-surface"
+                      : "text-on-surface-variant"
+                  }`}
+                >
+                  {label}
+                </span>
+                {i < STEP_LABELS.length - 1 && (
+                  <div
+                    className={`flex-1 h-0.5 ${
+                      isDone
+                        ? "bg-green-400/40"
+                        : "bg-surface-container-highest"
+                    }`}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
-        {/* Step 2: Choose Design */}
-        {step === 1 && (
-          <Layout>
-            <Layout.Section>
-              <Card>
-                <BlockStack gap="400">
-                  <InlineStack align="space-between">
-                    <Text as="h2" variant="headingMd">
-                      Choose a Design
-                    </Text>
-                    <Button onClick={() => setStep(0)}>Back</Button>
-                  </InlineStack>
-                  {loadingDesigns ? (
-                    <Text as="p" tone="subdued">Loading designs...</Text>
-                  ) : designs.length === 0 ? (
-                    <Banner tone="warning">
-                      <p>
-                        No designs found. Please{" "}
-                        <Button variant="plain" onClick={() => navigate("/designs/upload")}>
-                          upload a design
-                        </Button>{" "}
-                        first.
-                      </p>
-                    </Banner>
-                  ) : (
-                    <InlineGrid columns={{ xs: 2, sm: 3, md: 4 }} gap="400">
-                      {designs.map((design) => (
-                        <div
-                          key={design.id}
-                          onClick={() => {
-                            setSelectedDesign(design);
-                            setStep(2);
-                          }}
-                          style={{ cursor: "pointer" }}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              setSelectedDesign(design);
-                              setStep(2);
-                            }
-                          }}
-                        >
-                          <Card>
-                            <BlockStack gap="200">
-                              <Box
-                                background="bg-surface-secondary"
-                                borderRadius="200"
-                                padding="300"
-                                minHeight="100px"
-                              >
-                                <InlineStack align="center">
-                                  <Thumbnail
-                                    source={
-                                      design.thumbnailUrl ||
-                                      design.fileUrl ||
-                                      "/images/placeholder-design.png"
-                                    }
-                                    alt={design.name}
-                                    size="large"
-                                  />
-                                </InlineStack>
-                              </Box>
-                              <Text as="h3" variant="bodySm" truncate>
-                                {design.name}
-                              </Text>
-                            </BlockStack>
-                          </Card>
-                        </div>
-                      ))}
-                    </InlineGrid>
-                  )}
-                </BlockStack>
-              </Card>
-            </Layout.Section>
-          </Layout>
-        )}
+      {(fetcher.data?.error || loadError) && (
+        <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-6 py-4 rounded-2xl">
+          <p className="text-sm font-bold">Error</p>
+          <p className="text-xs opacity-80">
+            {fetcher.data?.error || loadError}
+          </p>
+        </div>
+      )}
 
-        {/* Step 3: Configure & Price */}
-        {step === 2 && selectedProduct && selectedDesign && (
-          <Layout>
-            <Layout.Section>
-              <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
-                {/* Left: Selected product + design */}
-                <Card>
-                  <BlockStack gap="400">
-                    <Text as="h2" variant="headingMd">
-                      Selected Items
-                    </Text>
-                    <BlockStack gap="300">
-                      <InlineStack gap="300" blockAlign="center">
-                        <Thumbnail
-                          source={
-                            Object.values(selectedProduct.blankImages)[0] ||
-                            "/images/placeholder-design.png"
-                          }
-                          alt={selectedProduct.name}
-                          size="medium"
+      {/* ─── Step 1: Choose Product ─── */}
+      {step === 0 && (
+        <section className="bg-surface-container-low rounded-2xl p-8 space-y-6">
+          <h2 className="text-xl font-bold font-headline">
+            Choose a Product from the Catalog
+          </h2>
+          {loadingCatalog ? (
+            <p className="text-on-surface-variant text-sm">Loading catalog...</p>
+          ) : providerProducts.length === 0 ? (
+            <p className="text-on-surface-variant text-sm">
+              No active products found in the catalog.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {providerProducts.map((pp) => {
+                const img = Object.values(pp.blankImages)[0];
+                return (
+                  <button
+                    key={pp.id}
+                    onClick={() => {
+                      setSelectedProduct(pp);
+                      setStep(1);
+                    }}
+                    className="bg-surface-container p-4 rounded-2xl text-left hover:bg-surface-container-high transition-colors group"
+                  >
+                    <div className="w-full h-40 rounded-xl bg-surface-container-highest mb-4 flex items-center justify-center overflow-hidden">
+                      {img ? (
+                        <img
+                          src={img}
+                          alt={pp.name}
+                          className="w-full h-full object-contain p-4"
                         />
-                        <BlockStack gap="100">
-                          <Text as="h3" variant="headingSm">
-                            {selectedProduct.name}
-                          </Text>
-                          <Badge>{selectedProduct.productType}</Badge>
-                          <Text as="p" variant="bodySm" tone="subdued">
-                            Base cost: ${selectedProduct.baseCost.toFixed(2)}
-                          </Text>
-                        </BlockStack>
-                      </InlineStack>
-                      <Divider />
-                      <InlineStack gap="300" blockAlign="center">
-                        <Thumbnail
-                          source={
-                            selectedDesign.thumbnailUrl ||
-                            selectedDesign.fileUrl ||
-                            "/images/placeholder-design.png"
-                          }
-                          alt={selectedDesign.name}
-                          size="medium"
-                        />
-                        <BlockStack gap="100">
-                          <Text as="h3" variant="headingSm">
-                            {selectedDesign.name}
-                          </Text>
-                          <Text as="p" variant="bodySm" tone="subdued">
-                            Design
-                          </Text>
-                        </BlockStack>
-                      </InlineStack>
-                    </BlockStack>
-                  </BlockStack>
-                </Card>
-
-                {/* Right: Configuration form */}
-                <Card>
-                  <BlockStack gap="400">
-                    <Text as="h2" variant="headingMd">
-                      Configure Product
-                    </Text>
-                    <FormLayout>
-                      <TextField
-                        label="Product Title"
-                        value={title}
-                        onChange={setTitle}
-                        autoComplete="off"
-                      />
-                      <Select
-                        label="Print Area"
-                        options={selectedProduct.printAreas.map((pa) => ({
-                          label: `${pa.name} (${pa.widthPx}x${pa.heightPx}px @ ${pa.dpi}dpi)`,
-                          value: pa.name,
-                        }))}
-                        value={selectedPrintArea}
-                        onChange={setSelectedPrintArea}
-                      />
-                      <TextField
-                        label="Retail Price (USD)"
-                        type="number"
-                        value={retailPrice}
-                        onChange={handleRetailPriceChange}
-                        prefix="$"
-                        autoComplete="off"
-                        min={0}
-                        step={0.01}
-                      />
-                    </FormLayout>
-
-                    {/* Pricing Breakdown */}
-                    {pricingLoading && (
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Calculating pricing...
-                      </Text>
-                    )}
-                    {pricing && !pricingLoading && (
-                      <Card>
-                        <BlockStack gap="200">
-                          <Text as="h3" variant="headingSm">
-                            Pricing Breakdown
-                          </Text>
-                          <InlineStack align="space-between">
-                            <Text as="span" variant="bodyMd">
-                              Retail Price
-                            </Text>
-                            <Text as="span" variant="bodyMd">
-                              ${pricing.retailPrice.toFixed(2)}
-                            </Text>
-                          </InlineStack>
-                          <InlineStack align="space-between">
-                            <Text as="span" variant="bodyMd">
-                              Base Cost
-                            </Text>
-                            <Text as="span" variant="bodyMd">
-                              -${pricing.baseCost.toFixed(2)}
-                            </Text>
-                          </InlineStack>
-                          <InlineStack align="space-between">
-                            <Text as="span" variant="bodyMd">
-                              Platform Fee (5%)
-                            </Text>
-                            <Text as="span" variant="bodyMd">
-                              -${pricing.platformFee.toFixed(2)}
-                            </Text>
-                          </InlineStack>
-                          <Divider />
-                          <InlineStack align="space-between">
-                            <Text as="span" variant="headingSm">
-                              Your Profit
-                            </Text>
-                            <Text
-                              as="span"
-                              variant="headingSm"
-                              tone={pricing.profitMargin >= 0 ? "success" : "critical"}
-                            >
-                              ${pricing.profitMargin.toFixed(2)} (
-                              {pricing.profitPercent.toFixed(1)}%)
-                            </Text>
-                          </InlineStack>
-                        </BlockStack>
-                      </Card>
-                    )}
-
-                    <InlineStack gap="200" align="end">
-                      <Button onClick={() => setStep(1)}>Back</Button>
-                      <fetcher.Form method="post">
-                        <input type="hidden" name="intent" value="create-draft" />
-                        <input type="hidden" name="designId" value={selectedDesign.id} />
-                        <input
-                          type="hidden"
-                          name="providerProductId"
-                          value={selectedProduct.id}
-                        />
-                        <input type="hidden" name="title" value={title} />
-                        <input type="hidden" name="retailPrice" value={retailPrice} />
-                        <input type="hidden" name="printArea" value={selectedPrintArea} />
-                        <Button
-                          variant="primary"
-                          submit
-                          disabled={
-                            !title ||
-                            !retailPrice ||
-                            parseFloat(retailPrice) <= 0 ||
-                            isSubmitting
-                          }
-                          loading={isSubmitting}
-                        >
-                          Create Draft
-                        </Button>
-                      </fetcher.Form>
-                    </InlineStack>
-                  </BlockStack>
-                </Card>
-              </InlineGrid>
-            </Layout.Section>
-          </Layout>
-        )}
-
-        {/* Step 4: Review & Publish */}
-        {step === 3 && selectedProduct && selectedDesign && (
-          <Layout>
-            <Layout.Section>
-              <Card>
-                <BlockStack gap="400">
-                  <Banner tone="success">
-                    <p>Product draft created successfully!</p>
-                  </Banner>
-
-                  <Text as="h2" variant="headingMd">
-                    Product Summary
-                  </Text>
-
-                  <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
-                    <BlockStack gap="300">
-                      <InlineStack gap="300" blockAlign="center">
-                        <Thumbnail
-                          source={
-                            selectedDesign.thumbnailUrl ||
-                            selectedDesign.fileUrl ||
-                            "/images/placeholder-design.png"
-                          }
-                          alt={selectedDesign.name}
-                          size="large"
-                        />
-                        <BlockStack gap="100">
-                          <Text as="h3" variant="headingMd">
-                            {title}
-                          </Text>
-                          <Text as="p" variant="bodySm" tone="subdued">
-                            Design: {selectedDesign.name}
-                          </Text>
-                        </BlockStack>
-                      </InlineStack>
-                    </BlockStack>
-
-                    <BlockStack gap="200">
-                      <InlineStack align="space-between">
-                        <Text as="span" variant="bodyMd">
-                          Provider Product
-                        </Text>
-                        <Text as="span" variant="bodyMd">
-                          {selectedProduct.name}
-                        </Text>
-                      </InlineStack>
-                      <InlineStack align="space-between">
-                        <Text as="span" variant="bodyMd">
-                          Product Type
-                        </Text>
-                        <Badge>{selectedProduct.productType}</Badge>
-                      </InlineStack>
-                      <InlineStack align="space-between">
-                        <Text as="span" variant="bodyMd">
-                          Retail Price
-                        </Text>
-                        <Text as="span" variant="bodyMd" fontWeight="bold">
-                          ${parseFloat(retailPrice).toFixed(2)}
-                        </Text>
-                      </InlineStack>
-                      <InlineStack align="space-between">
-                        <Text as="span" variant="bodyMd">
-                          Base Cost
-                        </Text>
-                        <Text as="span" variant="bodyMd">
-                          ${selectedProduct.baseCost.toFixed(2)}
-                        </Text>
-                      </InlineStack>
-                      <InlineStack align="space-between">
-                        <Text as="span" variant="bodyMd">
-                          Print Area
-                        </Text>
-                        <Text as="span" variant="bodyMd">
-                          {selectedPrintArea}
-                        </Text>
-                      </InlineStack>
-                      {pricing && (
-                        <InlineStack align="space-between">
-                          <Text as="span" variant="bodyMd">
-                            Estimated Profit
-                          </Text>
-                          <Text
-                            as="span"
-                            variant="bodyMd"
-                            fontWeight="bold"
-                            tone={pricing.profitMargin >= 0 ? "success" : "critical"}
-                          >
-                            ${pricing.profitMargin.toFixed(2)}
-                          </Text>
-                        </InlineStack>
+                      ) : (
+                        <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">
+                          checkroom
+                        </span>
                       )}
-                    </BlockStack>
-                  </InlineGrid>
-
-                  <Divider />
-
-                  <InlineStack gap="200" align="end">
-                    <Button onClick={() => navigate("/products")}>
-                      Save as Draft
-                    </Button>
-                    {createdProductId && (
-                      <fetcher.Form method="post">
-                        <input type="hidden" name="intent" value="publish" />
-                        <input type="hidden" name="productId" value={createdProductId} />
-                        <Button
-                          variant="primary"
-                          submit
-                          loading={isSubmitting}
-                          disabled={isSubmitting}
-                        >
-                          Publish to Shopify
-                        </Button>
-                      </fetcher.Form>
+                    </div>
+                    <h3 className="font-bold mb-1 group-hover:text-primary transition-colors">
+                      {pp.name}
+                    </h3>
+                    {pp.brand && (
+                      <p className="text-xs text-on-surface-variant">
+                        {pp.brand}
+                      </p>
                     )}
-                  </InlineStack>
-                </BlockStack>
-              </Card>
-            </Layout.Section>
-          </Layout>
-        )}
-      </BlockStack>
-    </Page>
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded-full bg-[#6366F1]/10 text-[#6366F1] text-[10px] font-bold uppercase">
+                        {pp.productType}
+                      </span>
+                      <span className="font-mono font-bold text-sm">
+                        ${pp.baseCost.toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-on-surface-variant mt-2">
+                      {pp.productionDays} day
+                      {pp.productionDays !== 1 ? "s" : ""} production
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ─── Step 2: Choose Design ─── */}
+      {step === 1 && (
+        <section className="bg-surface-container-low rounded-2xl p-8 space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold font-headline">
+              Choose a Design
+            </h2>
+            <Button
+              variant="secondary"
+              className="!py-2"
+              onClick={() => setStep(0)}
+            >
+              Back
+            </Button>
+          </div>
+          {loadingDesigns ? (
+            <p className="text-on-surface-variant text-sm">Loading designs...</p>
+          ) : designs.length === 0 ? (
+            <div className="bg-amber-400/10 border border-amber-400/20 text-amber-200 px-6 py-4 rounded-2xl">
+              <p className="text-sm">
+                No designs found.{" "}
+                <Link
+                  to="/designs/upload"
+                  className="underline font-bold text-amber-300"
+                >
+                  Upload a design
+                </Link>{" "}
+                first.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+              {designs.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => {
+                    setSelectedDesign(d);
+                    setStep(2);
+                  }}
+                  className="bg-surface-container p-3 rounded-2xl text-left hover:bg-surface-container-high transition-colors group"
+                >
+                  <div className="w-full aspect-square rounded-xl bg-surface-container-highest mb-3 flex items-center justify-center overflow-hidden">
+                    {d.thumbnailUrl || d.fileUrl ? (
+                      <img
+                        src={d.thumbnailUrl || d.fileUrl}
+                        alt={d.name}
+                        className="w-full h-full object-contain p-2"
+                      />
+                    ) : (
+                      <span className="material-symbols-outlined text-3xl text-on-surface-variant/40">
+                        image
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                    {d.name}
+                  </h4>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ─── Step 3: Configure & Price ─── */}
+      {step === 2 && selectedProduct && selectedDesign && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <section className="bg-surface-container-low rounded-2xl p-8 space-y-6">
+            <h2 className="text-xl font-bold font-headline">Selected Items</h2>
+
+            <div className="flex items-center gap-4 p-4 bg-surface-container rounded-xl">
+              <div className="w-16 h-16 rounded-xl bg-surface-container-highest flex items-center justify-center overflow-hidden">
+                {Object.values(selectedProduct.blankImages)[0] ? (
+                  <img
+                    src={Object.values(selectedProduct.blankImages)[0]}
+                    alt={selectedProduct.name}
+                    className="w-full h-full object-contain p-2"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined text-2xl text-on-surface-variant/40">
+                    checkroom
+                  </span>
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold">{selectedProduct.name}</h3>
+                <span className="px-2 py-0.5 rounded-full bg-[#6366F1]/10 text-[#6366F1] text-[10px] font-bold uppercase">
+                  {selectedProduct.productType}
+                </span>
+                <p className="text-xs text-on-surface-variant mt-1 font-mono">
+                  Base ${selectedProduct.baseCost.toFixed(2)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 p-4 bg-surface-container rounded-xl">
+              <div className="w-16 h-16 rounded-xl bg-surface-container-highest flex items-center justify-center overflow-hidden">
+                {selectedDesign.thumbnailUrl || selectedDesign.fileUrl ? (
+                  <img
+                    src={selectedDesign.thumbnailUrl || selectedDesign.fileUrl}
+                    alt={selectedDesign.name}
+                    className="w-full h-full object-contain p-2"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined text-2xl text-on-surface-variant/40">
+                    image
+                  </span>
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold">{selectedDesign.name}</h3>
+                <p className="text-xs text-on-surface-variant">Design</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-surface-container-low rounded-2xl p-8 space-y-6">
+            <h2 className="text-xl font-bold font-headline">
+              Configure Product
+            </h2>
+
+            <div className="space-y-5">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
+                  Product Title
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="ghost-input font-headline text-lg"
+                  placeholder="My Awesome Product"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
+                  Print Area
+                </label>
+                <select
+                  value={selectedPrintArea}
+                  onChange={(e) => setSelectedPrintArea(e.target.value)}
+                  className="w-full bg-surface-container text-on-surface rounded-xl px-4 py-3 border-0 focus:ring-2 focus:ring-primary"
+                >
+                  {selectedProduct.printAreas.map((pa) => (
+                    <option key={pa.name} value={pa.name}>
+                      {pa.name} ({pa.widthPx}×{pa.heightPx}px @ {pa.dpi}dpi)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
+                  Retail Price (USD)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-0 top-3 text-on-surface-variant font-mono">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    value={retailPrice}
+                    onChange={(e) => handleRetailPriceChange(e.target.value)}
+                    step="0.01"
+                    min="0"
+                    className="ghost-input pl-6 font-mono text-lg"
+                    placeholder="29.99"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {pricingLoading && (
+              <p className="text-on-surface-variant text-sm">
+                Calculating pricing...
+              </p>
+            )}
+
+            {pricing && !pricingLoading && (
+              <div className="bg-surface-container p-6 rounded-2xl space-y-3 text-sm">
+                <PricingRow
+                  label="Retail Price"
+                  value={`$${pricing.retailPrice.toFixed(2)}`}
+                  bold
+                />
+                <PricingRow
+                  label="Base Cost"
+                  value={`-$${pricing.baseCost.toFixed(2)}`}
+                />
+                <PricingRow
+                  label="Platform Fee (5%)"
+                  value={`-$${pricing.platformFee.toFixed(2)}`}
+                />
+                <div className="h-[1px] bg-outline-variant/20" />
+                <div className="flex justify-between items-center">
+                  <span className="font-bold">Your Profit</span>
+                  <span
+                    className={`font-mono font-bold text-lg ${
+                      pricing.profitMargin >= 0 ? "text-green-400" : "text-red-400"
+                    }`}
+                  >
+                    ${pricing.profitMargin.toFixed(2)}
+                    <span className="text-xs ml-1 opacity-70">
+                      ({pricing.profitPercent.toFixed(1)}%)
+                    </span>
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 justify-end">
+              <Button
+                variant="secondary"
+                className="!py-2"
+                onClick={() => setStep(1)}
+              >
+                Back
+              </Button>
+              <fetcher.Form method="post">
+                <input type="hidden" name="intent" value="create-draft" />
+                <input type="hidden" name="designId" value={selectedDesign.id} />
+                <input
+                  type="hidden"
+                  name="providerProductId"
+                  value={selectedProduct.id}
+                />
+                <input type="hidden" name="title" value={title} />
+                <input type="hidden" name="retailPrice" value={retailPrice} />
+                <input type="hidden" name="printArea" value={selectedPrintArea} />
+                <Button
+                  type="submit"
+                  disabled={
+                    !title ||
+                    !retailPrice ||
+                    parseFloat(retailPrice) <= 0 ||
+                    isSubmitting
+                  }
+                >
+                  {isSubmitting ? "Creating..." : "Create Draft"}
+                </Button>
+              </fetcher.Form>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* ─── Step 4: Review & Publish ─── */}
+      {step === 3 && selectedProduct && selectedDesign && (
+        <section className="bg-surface-container-low rounded-2xl p-8 space-y-8">
+          <div className="bg-green-400/10 border border-green-400/20 text-green-300 px-6 py-4 rounded-2xl flex items-center gap-3">
+            <span className="material-symbols-outlined">check_circle</span>
+            <p className="text-sm font-bold">
+              Product draft created successfully!
+            </p>
+          </div>
+
+          <h2 className="text-xl font-bold font-headline">Product Summary</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="flex items-center gap-4">
+              <div className="w-24 h-24 rounded-2xl bg-surface-container-highest flex items-center justify-center overflow-hidden">
+                {selectedDesign.thumbnailUrl || selectedDesign.fileUrl ? (
+                  <img
+                    src={selectedDesign.thumbnailUrl || selectedDesign.fileUrl}
+                    alt={selectedDesign.name}
+                    className="w-full h-full object-contain p-3"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined text-3xl text-on-surface-variant/40">
+                    image
+                  </span>
+                )}
+              </div>
+              <div>
+                <h3 className="text-lg font-bold font-headline">{title}</h3>
+                <p className="text-sm text-on-surface-variant">
+                  Design: {selectedDesign.name}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-surface-container p-6 rounded-2xl space-y-3 text-sm">
+              <PricingRow
+                label="Provider Product"
+                value={selectedProduct.name}
+              />
+              <PricingRow
+                label="Type"
+                value={selectedProduct.productType}
+              />
+              <PricingRow
+                label="Retail Price"
+                value={`$${parseFloat(retailPrice).toFixed(2)}`}
+                bold
+              />
+              <PricingRow
+                label="Base Cost"
+                value={`$${selectedProduct.baseCost.toFixed(2)}`}
+              />
+              <PricingRow label="Print Area" value={selectedPrintArea} />
+              {pricing && (
+                <div className="flex justify-between items-center pt-2 border-t border-outline-variant/20">
+                  <span className="font-bold">Estimated Profit</span>
+                  <span
+                    className={`font-mono font-bold ${
+                      pricing.profitMargin >= 0 ? "text-green-400" : "text-red-400"
+                    }`}
+                  >
+                    ${pricing.profitMargin.toFixed(2)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 justify-end">
+            <LinkButton to="/products" variant="secondary">
+              Save as Draft
+            </LinkButton>
+            {createdProductId && (
+              <fetcher.Form method="post">
+                <input type="hidden" name="intent" value="publish" />
+                <input
+                  type="hidden"
+                  name="productId"
+                  value={createdProductId}
+                />
+                <Button type="submit" disabled={isSubmitting} icon="rocket_launch">
+                  {isSubmitting ? "Publishing..." : "Publish to Shopify"}
+                </Button>
+              </fetcher.Form>
+            )}
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
+
+function PricingRow({
+  label,
+  value,
+  bold = false,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+}) {
+  return (
+    <div className="flex justify-between items-center">
+      <span className="text-on-surface-variant">{label}</span>
+      <span
+        className={`font-mono ${bold ? "font-bold text-on-surface" : ""}`}
+      >
+        {value}
+      </span>
+    </div>
   );
 }
