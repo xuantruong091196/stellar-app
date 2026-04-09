@@ -1,19 +1,36 @@
 import { useState, useCallback, useRef } from "react";
-import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
+import type {
+  MetaFunction,
+  ActionFunctionArgs,
+  LoaderFunctionArgs,
+} from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useFetcher, Link } from "@remix-run/react";
 import { apiPost } from "~/lib/api";
+import { requireUser } from "~/lib/session.server";
 import type { Design } from "~/lib/types";
 import { PageHeader } from "~/components/ui/PageHeader";
 import { Button, LinkButton } from "~/components/ui/Button";
+import { pageMeta } from "~/lib/seo";
 
-export const meta: MetaFunction = () => [
-  { title: "StellarPOD — Upload Design" },
-];
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: "Upload Design",
+    description:
+      "Upload new artwork to your StellarPOD design library. High-resolution PNG, JPG and SVG supported.",
+    path: "/designs/upload",
+    noIndex: true,
+  });
 
 const STORE_ID = "demo-store";
 
+export async function loader({ request }: LoaderFunctionArgs) {
+  await requireUser(request);
+  return json({});
+}
+
 export async function action({ request }: ActionFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const formData = await request.formData();
   const name = formData.get("name") as string;
   const fileBase64 = formData.get("fileBase64") as string;
@@ -27,12 +44,16 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  const result = await apiPost<Design>(`/designs/${STORE_ID}`, {
-    name,
-    fileBase64,
-    filename,
-    mimetype,
-  });
+  const result = await apiPost<Design>(
+    `/designs/${STORE_ID}`,
+    {
+      name,
+      fileBase64,
+      filename,
+      mimetype,
+    },
+    walletAddress,
+  );
 
   if (result.error) {
     return json(

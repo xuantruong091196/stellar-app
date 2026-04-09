@@ -6,22 +6,31 @@ import type {
 import { json } from "@remix-run/node";
 import { useLoaderData, useFetcher, Link } from "@remix-run/react";
 import { apiGet, apiDelete } from "~/lib/api";
+import { requireUser } from "~/lib/session.server";
 import type { Design, PaginatedResponse } from "~/lib/types";
 import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
 import { LinkButton } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/StatusPill";
+import { pageMeta } from "~/lib/seo";
 
-export const meta: MetaFunction = () => [
-  { title: "StellarPOD — Designs" },
-];
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: "Designs",
+    description:
+      "Your creative library — upload artwork, manage design files and attach them to new print-on-demand products.",
+    path: "/designs",
+    noIndex: true,
+  });
 
 const STORE_ID = "demo-store";
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const url = new URL(request.url);
   const page = url.searchParams.get("page") || "1";
   const res = await apiGet<PaginatedResponse<Design>>(
     `/designs/${STORE_ID}?page=${page}&limit=20`,
+    walletAddress,
   );
   if (res.error)
     return json({ designs: [] as Design[], meta: null, error: res.error });
@@ -34,13 +43,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
   if (intent === "delete") {
     const designId = formData.get("designId") as string;
     if (!designId)
       return json({ error: "Missing designId" }, { status: 400 });
-    const r = await apiDelete(`/designs/${designId}`);
+    const r = await apiDelete(`/designs/${designId}`, walletAddress);
     return r.error
       ? json({ error: r.error }, { status: r.status || 500 })
       : json({ success: true });

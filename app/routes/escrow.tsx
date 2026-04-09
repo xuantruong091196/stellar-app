@@ -6,22 +6,31 @@ import type {
 import { json } from "@remix-run/node";
 import { useLoaderData, useFetcher, Link } from "@remix-run/react";
 import { apiGet, apiPost } from "~/lib/api";
+import { requireUser } from "~/lib/session.server";
 import type { Escrow, PaginatedResponse, EscrowStatus } from "~/lib/types";
 import { PageHeader, StatCard, EmptyState } from "~/components/ui/PageHeader";
 import { EscrowPill } from "~/components/ui/StatusPill";
+import { pageMeta } from "~/lib/seo";
 
-export const meta: MetaFunction = () => [
-  { title: "StellarPOD — Escrow" },
-];
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: "Escrow Dashboard",
+    description:
+      "Track USDC escrow balances across every order. Funds held on the Stellar network until fulfilment is confirmed — no chargebacks.",
+    path: "/escrow",
+    noIndex: true,
+  });
 
 const STORE_ID = "demo-store";
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1", 10);
 
   const result = await apiGet<PaginatedResponse<Escrow>>(
     `/escrow/store/${STORE_ID}?page=${page}&limit=20`,
+    walletAddress,
   );
 
   if (result.error || !result.data) {
@@ -65,6 +74,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
   if (intent === "release") {
@@ -74,7 +84,7 @@ export async function action({ request }: ActionFunctionArgs) {
         { success: false, error: "Missing escrow ID" },
         { status: 400 },
       );
-    const r = await apiPost(`/escrow/${escrowId}/release`, {});
+    const r = await apiPost(`/escrow/${escrowId}/release`, {}, walletAddress);
     return r.error
       ? json(
           { success: false, error: r.error },

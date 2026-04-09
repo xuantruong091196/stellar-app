@@ -1,5 +1,6 @@
-import { Link, useLocation } from "@remix-run/react";
+import { Link, useLocation, Form } from "@remix-run/react";
 import type { ReactNode } from "react";
+import { truncateAddress } from "~/lib/stellar";
 
 interface NavItem {
   label: string;
@@ -54,7 +55,13 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  userAddress,
+}: {
+  children: ReactNode;
+  userAddress: string | null;
+}) {
   const location = useLocation();
   const currentPath = location.pathname;
 
@@ -67,24 +74,54 @@ export function AppShell({ children }: { children: ReactNode }) {
     <>
       {/* ─── TopAppBar ──────────────────────────────── */}
       <header className="fixed top-0 z-50 bg-[#121317] flex justify-between items-center w-full px-6 h-16 font-headline tracking-tight">
-        <div className="flex items-center gap-4">
-          <Link
-            to="/"
-            className="text-xl font-bold bg-gradient-to-r from-[#6366F1] to-[#22D3EE] bg-clip-text text-transparent"
-          >
-            StellarPOD
+        <div className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3">
+            <img
+              src="/images/logo.png"
+              alt="StellarPOD logo"
+              className="w-9 h-9 rounded-xl object-contain"
+            />
+            <span className="text-xl font-bold bg-gradient-to-r from-[#6366F1] to-[#22D3EE] bg-clip-text text-transparent">
+              StellarPOD
+            </span>
           </Link>
         </div>
         <div className="flex items-center gap-6">
           <div className="hidden md:flex gap-8 items-center text-sm">
             <span className="text-on-surface-variant">{activeLabel}</span>
           </div>
-          <div className="flex items-center gap-4 bg-surface-container-low px-4 py-2 rounded-full">
-            <span className="font-mono text-xs text-on-surface-variant">
-              0x...A1B2 • 1,240 USDC
-            </span>
-            <div className="w-6 h-6 rounded-full stellar-gradient" />
-          </div>
+          {userAddress ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 bg-surface-container-low px-4 py-2 rounded-full">
+                <div className="w-6 h-6 rounded-full stellar-gradient" />
+                <span className="font-mono text-xs text-on-surface-variant">
+                  {truncateAddress(userAddress)}
+                </span>
+              </div>
+              <Form method="post" action="/logout">
+                <button
+                  type="submit"
+                  className="w-9 h-9 rounded-full bg-surface-container-low hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-red-400 transition-colors"
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <span
+                    className="material-symbols-outlined text-base"
+                    aria-hidden
+                  >
+                    logout
+                  </span>
+                </button>
+              </Form>
+            </div>
+          ) : (
+            <Link
+              to="/login"
+              className="stellar-gradient text-white px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider hover:brightness-110 transition-all"
+            >
+              Sign In
+            </Link>
+          )}
         </div>
       </header>
 
@@ -92,14 +129,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="hidden lg:flex flex-col py-8 h-screen w-64 fixed left-0 top-0 bg-[#121317] z-40">
         <div className="px-6 mb-12 mt-16">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-surface-container-highest p-1 flex items-center justify-center stellar-gradient">
-              <span
-                className="material-symbols-outlined text-white text-lg"
-                aria-hidden
-              >
-                rocket_launch
-              </span>
-            </div>
+            <img
+              src="/images/logo.png"
+              alt="StellarPOD logo"
+              className="w-10 h-10 rounded-xl object-contain"
+            />
             <div>
               <h3 className="text-sm font-bold text-on-surface uppercase tracking-wider">
                 Mission Control

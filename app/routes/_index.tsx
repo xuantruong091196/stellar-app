@@ -1,7 +1,8 @@
-import type { MetaFunction } from "@remix-run/node";
+import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { apiGet } from "~/lib/api";
+import { requireUser } from "~/lib/session.server";
 import type {
   Order,
   Escrow,
@@ -11,19 +12,27 @@ import type {
 import { PageHeader, StatCard, SectionCard, EmptyState } from "~/components/ui/PageHeader";
 import { LinkButton } from "~/components/ui/Button";
 import { EscrowPill } from "~/components/ui/StatusPill";
+import { pageMeta } from "~/lib/seo";
 
-export const meta: MetaFunction = () => [
-  { title: "StellarPOD — Mission Control" },
-];
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: "Mission Control",
+    description:
+      "Real-time overview of your Stellar print-on-demand business — orders, escrow balances, revenue and fulfilment at a glance.",
+    path: "/",
+    noIndex: true,
+  });
 
 const STORE_ID = "demo-store";
 
-export async function loader() {
+export async function loader({ request }: LoaderFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const [ordersRes, escrowsRes, productsRes] = await Promise.all([
-    apiGet<PaginatedResponse<Order>>(`/orders/${STORE_ID}?limit=5`),
-    apiGet<PaginatedResponse<Escrow>>(`/escrow/store/${STORE_ID}?limit=5`),
+    apiGet<PaginatedResponse<Order>>(`/orders/${STORE_ID}?limit=5`, walletAddress),
+    apiGet<PaginatedResponse<Escrow>>(`/escrow/store/${STORE_ID}?limit=5`, walletAddress),
     apiGet<PaginatedResponse<MerchantProduct>>(
       `/products/store/${STORE_ID}?limit=100`,
+      walletAddress,
     ),
   ]);
 

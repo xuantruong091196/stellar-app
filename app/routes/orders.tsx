@@ -3,15 +3,22 @@ import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useSearchParams, Link } from "@remix-run/react";
 import { apiGet } from "~/lib/api";
+import { requireUser } from "~/lib/session.server";
 import type { Order, PaginatedResponse, OrderStatus } from "~/lib/types";
 import { ORDER_STATUS_LABELS } from "~/lib/types";
 import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
 import { Button } from "~/components/ui/Button";
 import { OrderPill, EscrowPill } from "~/components/ui/StatusPill";
+import { pageMeta } from "~/lib/seo";
 
-export const meta: MetaFunction = () => [
-  { title: "StellarPOD — Orders" },
-];
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: "Orders",
+    description:
+      "Track every print-on-demand order across its full lifecycle — from escrow lock to delivery confirmation on the Stellar network.",
+    path: "/orders",
+    noIndex: true,
+  });
 
 const STORE_ID = "demo-store";
 
@@ -26,6 +33,7 @@ const STATUS_FILTERS: (OrderStatus | "")[] = [
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const url = new URL(request.url);
   const status = url.searchParams.get("status") || "";
   const page = url.searchParams.get("page") || "1";
@@ -34,7 +42,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let endpoint = `/orders/${STORE_ID}?page=${page}&limit=20`;
   if (status) endpoint += `&status=${status}`;
 
-  const res = await apiGet<PaginatedResponse<Order>>(endpoint);
+  const res = await apiGet<PaginatedResponse<Order>>(endpoint, walletAddress);
   return json({
     orders: res.data?.data ?? [],
     meta: res.data?.meta ?? { total: 0, page: 1, limit: 20, totalPages: 1 },

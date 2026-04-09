@@ -6,25 +6,36 @@ import type {
 import { json } from "@remix-run/node";
 import { useLoaderData, useNavigate, useFetcher, Link } from "@remix-run/react";
 import { apiGet, apiPost, apiDelete } from "~/lib/api";
+import { requireUser } from "~/lib/session.server";
 import type { MerchantProduct } from "~/lib/types";
 import { PageHeader, SectionCard } from "~/components/ui/PageHeader";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { ProductPill } from "~/components/ui/StatusPill";
+import { pageMeta } from "~/lib/seo";
 
-export const meta: MetaFunction = () => [
-  { title: "StellarPOD — Product Detail" },
-];
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: "Product Detail",
+    description:
+      "Inspect and manage an individual print-on-demand product — pricing, variants, artwork and publish status.",
+    noIndex: true,
+  });
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const { productId } = params;
   if (!productId)
     return json({ product: null, error: "Missing product ID" });
 
-  const res = await apiGet<MerchantProduct>(`/products/${productId}`);
+  const res = await apiGet<MerchantProduct>(
+    `/products/${productId}`,
+    walletAddress,
+  );
   return json({ product: res.data ?? null, error: res.error });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
   const productId = params.productId;
@@ -32,19 +43,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return json({ error: "Missing product ID" }, { status: 400 });
 
   if (intent === "publish") {
-    const r = await apiPost(`/products/${productId}/publish`, {});
+    const r = await apiPost(`/products/${productId}/publish`, {}, walletAddress);
     return r.error
       ? json({ error: r.error }, { status: r.status || 500 })
       : json({ success: true });
   }
   if (intent === "unpublish") {
-    const r = await apiPost(`/products/${productId}/unpublish`, {});
+    const r = await apiPost(`/products/${productId}/unpublish`, {}, walletAddress);
     return r.error
       ? json({ error: r.error }, { status: r.status || 500 })
       : json({ success: true });
   }
   if (intent === "delete") {
-    const r = await apiDelete(`/products/${productId}`);
+    const r = await apiDelete(`/products/${productId}`, walletAddress);
     return r.error
       ? json({ error: r.error }, { status: r.status || 500 })
       : json({ success: true, deleted: true });

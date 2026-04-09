@@ -7,6 +7,7 @@ import type {
 import { json } from "@remix-run/node";
 import { useLoaderData, useSearchParams, useFetcher } from "@remix-run/react";
 import { apiGet, apiPost, apiDelete } from "~/lib/api";
+import { requireUser } from "~/lib/session.server";
 import type {
   Provider,
   StoreProvider,
@@ -14,10 +15,16 @@ import type {
 } from "~/lib/types";
 import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
 import { Pill } from "~/components/ui/StatusPill";
+import { pageMeta } from "~/lib/seo";
 
-export const meta: MetaFunction = () => [
-  { title: "StellarPOD — Providers" },
-];
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: "Print Providers",
+    description:
+      "Discover verified print-on-demand partners on the Stellar network. Compare quality, lead times, specialties and rates.",
+    path: "/providers",
+    noIndex: true,
+  });
 
 const STORE_ID = "demo-store";
 
@@ -40,6 +47,7 @@ interface LoaderData {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const url = new URL(request.url);
   const country = url.searchParams.get("country") || "";
   const specialty = url.searchParams.get("specialty") || "";
@@ -54,8 +62,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const [providersResult, connectedResult] = await Promise.all([
     apiGet<PaginatedResponse<Provider>>(
       `/providers/search?${params.toString()}`,
+      walletAddress,
     ),
-    apiGet<StoreProvider[]>(`/providers/connected/${STORE_ID}`),
+    apiGet<StoreProvider[]>(
+      `/providers/connected/${STORE_ID}`,
+      walletAddress,
+    ),
   ]);
 
   if (providersResult.error) {
@@ -80,6 +92,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
   const providerId = formData.get("providerId") as string;
@@ -87,10 +100,11 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ error: "Missing providerId" }, { status: 400 });
 
   if (intent === "connect") {
-    const r = await apiPost("/providers/connect", {
-      storeId: STORE_ID,
-      providerId,
-    });
+    const r = await apiPost(
+      "/providers/connect",
+      { storeId: STORE_ID, providerId },
+      walletAddress,
+    );
     return r.error
       ? json({ error: r.error }, { status: r.status || 500 })
       : json({ success: true });
@@ -98,6 +112,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "disconnect") {
     const r = await apiDelete(
       `/providers/disconnect?storeId=${STORE_ID}&providerId=${providerId}`,
+      walletAddress,
     );
     return r.error
       ? json({ error: r.error }, { status: r.status || 500 })

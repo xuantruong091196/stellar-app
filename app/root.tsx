@@ -4,12 +4,36 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLoaderData,
+  useLocation,
 } from "@remix-run/react";
-import type { LinksFunction } from "@remix-run/node";
+import type {
+  LinksFunction,
+  LoaderFunctionArgs,
+  MetaFunction,
+} from "@remix-run/node";
+import { json } from "@remix-run/node";
 import appStyles from "~/styles/app.css?url";
 import { AppShell } from "~/components/layout/AppShell";
+import { getUserAddress } from "~/lib/session.server";
+import { pageMeta, SITE } from "~/lib/seo";
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const userAddress = await getUserAddress(request);
+  return json({ userAddress });
+}
+
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: SITE.tagline,
+    description: SITE.description,
+    path: "/",
+  });
 
 export const links: LinksFunction = () => [
+  { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+  { rel: "shortcut icon", href: "/favicon.ico", type: "image/x-icon" },
+  { rel: "apple-touch-icon", href: "/images/logo.png" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",
@@ -28,6 +52,11 @@ export const links: LinksFunction = () => [
 ];
 
 export default function App() {
+  const { userAddress } = useLoaderData<typeof loader>();
+  const location = useLocation();
+  const isAuthRoute =
+    location.pathname === "/login" || location.pathname === "/logout";
+
   return (
     <html lang="en" className="dark">
       <head>
@@ -37,9 +66,13 @@ export default function App() {
         <Links />
       </head>
       <body className="bg-surface text-on-surface font-body selection:bg-primary selection:text-on-primary-container">
-        <AppShell>
+        {isAuthRoute ? (
           <Outlet />
-        </AppShell>
+        ) : (
+          <AppShell userAddress={userAddress}>
+            <Outlet />
+          </AppShell>
+        )}
         <ScrollRestoration />
         <Scripts />
       </body>

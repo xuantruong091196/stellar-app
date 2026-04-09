@@ -13,6 +13,7 @@ import {
   Link,
 } from "@remix-run/react";
 import { apiGet, apiPost, apiDelete } from "~/lib/api";
+import { requireUser } from "~/lib/session.server";
 import type {
   MerchantProduct,
   PaginatedResponse,
@@ -20,16 +21,23 @@ import type {
 import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
 import { LinkButton, Button } from "~/components/ui/Button";
 import { ProductPill } from "~/components/ui/StatusPill";
+import { pageMeta } from "~/lib/seo";
 
-export const meta: MetaFunction = () => [
-  { title: "StellarPOD — Products" },
-];
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: "Products",
+    description:
+      "Manage your print-on-demand product catalog. Publish designs to Shopify and track sales across every SKU.",
+    path: "/products",
+    noIndex: true,
+  });
 
 const STORE_ID = "demo-store";
 
 const TAB_MAP: Record<number, string> = { 0: "", 1: "draft", 2: "published" };
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const url = new URL(request.url);
   const status = url.searchParams.get("status") || "";
   const page = url.searchParams.get("page") || "1";
@@ -37,7 +45,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let endpoint = `/products/store/${STORE_ID}?page=${page}&limit=20`;
   if (status) endpoint += `&status=${status}`;
 
-  const res = await apiGet<PaginatedResponse<MerchantProduct>>(endpoint);
+  const res = await apiGet<PaginatedResponse<MerchantProduct>>(
+    endpoint,
+    walletAddress,
+  );
 
   return json({
     products: res.data?.data ?? [],
@@ -47,6 +58,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
   const productId = formData.get("productId") as string;
@@ -54,19 +66,19 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ error: "Missing productId" }, { status: 400 });
 
   if (intent === "publish") {
-    const r = await apiPost(`/products/${productId}/publish`, {});
+    const r = await apiPost(`/products/${productId}/publish`, {}, walletAddress);
     return r.error
       ? json({ error: r.error }, { status: r.status || 500 })
       : json({ success: true });
   }
   if (intent === "unpublish") {
-    const r = await apiPost(`/products/${productId}/unpublish`, {});
+    const r = await apiPost(`/products/${productId}/unpublish`, {}, walletAddress);
     return r.error
       ? json({ error: r.error }, { status: r.status || 500 })
       : json({ success: true });
   }
   if (intent === "delete") {
-    const r = await apiDelete(`/products/${productId}`);
+    const r = await apiDelete(`/products/${productId}`, walletAddress);
     return r.error
       ? json({ error: r.error }, { status: r.status || 500 })
       : json({ success: true });

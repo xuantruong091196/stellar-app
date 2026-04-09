@@ -1,8 +1,18 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { ActionFunctionArgs, MetaFunction } from "@remix-run/node";
+import type {
+  ActionFunctionArgs,
+  LoaderFunctionArgs,
+  MetaFunction,
+} from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useFetcher, useNavigate, Link } from "@remix-run/react";
+import {
+  useFetcher,
+  useNavigate,
+  useLoaderData,
+  Link,
+} from "@remix-run/react";
 import { apiGet, apiPost } from "~/lib/api";
+import { requireUser } from "~/lib/session.server";
 import type {
   ProviderProduct,
   Design,
@@ -13,12 +23,23 @@ import type {
 } from "~/lib/types";
 import { PageHeader } from "~/components/ui/PageHeader";
 import { Button, LinkButton } from "~/components/ui/Button";
+import { pageMeta } from "~/lib/seo";
 
-export const meta: MetaFunction = () => [
-  { title: "StellarPOD — Create Product" },
-];
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: "Create Product",
+    description:
+      "Launch a new print-on-demand product in minutes. Pick a blank, attach your artwork, set your markup and publish straight to Shopify.",
+    path: "/products/new",
+    noIndex: true,
+  });
 
 const STORE_ID = "demo-store";
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const walletAddress = await requireUser(request);
+  return json({ walletAddress });
+}
 
 const STEP_LABELS = [
   "Choose Product",
@@ -28,6 +49,7 @@ const STEP_LABELS = [
 ];
 
 export async function action({ request }: ActionFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
 
@@ -50,13 +72,17 @@ export async function action({ request }: ActionFunctionArgs) {
       rotation: 0,
     };
 
-    const result = await apiPost<MerchantProduct>(`/products/${STORE_ID}`, {
-      designId,
-      providerProductId,
-      title,
-      retailPrice,
-      printConfig,
-    });
+    const result = await apiPost<MerchantProduct>(
+      `/products/${STORE_ID}`,
+      {
+        designId,
+        providerProductId,
+        title,
+        retailPrice,
+        printConfig,
+      },
+      walletAddress,
+    );
 
     if (result.error)
       return json({ error: result.error }, { status: result.status || 500 });
@@ -73,7 +99,11 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!productId)
       return json({ error: "Missing productId" }, { status: 400 });
 
-    const result = await apiPost(`/products/${productId}/publish`, {});
+    const result = await apiPost(
+      `/products/${productId}/publish`,
+      {},
+      walletAddress,
+    );
     if (result.error)
       return json({ error: result.error }, { status: result.status || 500 });
 
@@ -85,6 +115,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function CreateProduct() {
   const navigate = useNavigate();
+  const { walletAddress } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<{
     success?: boolean;
     error?: string;
@@ -117,6 +148,7 @@ export default function CreateProduct() {
       setLoadingCatalog(true);
       const res = await apiGet<PaginatedResponse<ProviderProduct>>(
         "/provider-products?isActive=true&limit=50",
+        walletAddress,
       );
       if (res.error) setLoadError(res.error);
       else
@@ -128,7 +160,7 @@ export default function CreateProduct() {
       setLoadingCatalog(false);
     }
     loadCatalog();
-  }, []);
+  }, [walletAddress]);
 
   useEffect(() => {
     if (step === 1 && designs.length === 0) {
@@ -136,6 +168,7 @@ export default function CreateProduct() {
         setLoadingDesigns(true);
         const res = await apiGet<PaginatedResponse<Design>>(
           `/designs/${STORE_ID}?limit=50`,
+          walletAddress,
         );
         if (res.error) setLoadError(res.error);
         else
@@ -146,7 +179,7 @@ export default function CreateProduct() {
       }
       loadDesigns();
     }
-  }, [step, designs.length]);
+  }, [step, designs.length, walletAddress]);
 
   useEffect(() => {
     if (selectedProduct) {
@@ -169,6 +202,7 @@ export default function CreateProduct() {
       debounceRef.current = setTimeout(async () => {
         const res = await apiGet<PricingBreakdown>(
           `/pricing/product/${selectedProduct.id}?retailPrice=${numPrice}`,
+          walletAddress,
         );
         if (res.data) {
           setPricing(res.data);
@@ -190,7 +224,7 @@ export default function CreateProduct() {
         setPricingLoading(false);
       }, 500);
     },
-    [selectedProduct],
+    [selectedProduct, walletAddress],
   );
 
   const handleRetailPriceChange = useCallback(

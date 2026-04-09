@@ -3,13 +3,20 @@ import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useSearchParams } from "@remix-run/react";
 import { apiGet } from "~/lib/api";
+import { requireUser } from "~/lib/session.server";
 import type { ProviderProduct, PaginatedResponse } from "~/lib/types";
 import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
 import { Button, LinkButton } from "~/components/ui/Button";
+import { pageMeta } from "~/lib/seo";
 
-export const meta: MetaFunction = () => [
-  { title: "StellarPOD — Catalog" },
-];
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: "Provider Catalog",
+    description:
+      "Browse blank products from verified print-on-demand providers. Filter by garment type, price and lead time to find the perfect blank.",
+    path: "/catalog",
+    noIndex: true,
+  });
 
 const PRODUCT_TYPES = [
   "",
@@ -21,6 +28,7 @@ const PRODUCT_TYPES = [
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const url = new URL(request.url);
   const productType = url.searchParams.get("productType") || "";
   const page = url.searchParams.get("page") || "1";
@@ -28,7 +36,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let endpoint = `/provider-products?page=${page}&limit=20`;
   if (productType) endpoint += `&productType=${encodeURIComponent(productType)}`;
 
-  const res = await apiGet<PaginatedResponse<ProviderProduct>>(endpoint);
+  const res = await apiGet<PaginatedResponse<ProviderProduct>>(
+    endpoint,
+    walletAddress,
+  );
   return json({
     products:
       res.data?.data ?? (res.data as unknown as ProviderProduct[]) ?? [],

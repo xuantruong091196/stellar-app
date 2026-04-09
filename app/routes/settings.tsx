@@ -1,17 +1,34 @@
 import { useState, useCallback } from "react";
-import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
+import type {
+  MetaFunction,
+  ActionFunctionArgs,
+  LoaderFunctionArgs,
+} from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useFetcher } from "@remix-run/react";
+import { requireUser } from "~/lib/session.server";
 import { WalletConnect } from "~/components/WalletConnect";
 import { PageHeader } from "~/components/ui/PageHeader";
 import { Button } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/StatusPill";
+import { pageMeta } from "~/lib/seo";
 
-export const meta: MetaFunction = () => [
-  { title: "StellarPOD — Settings" },
-];
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: "Settings",
+    description:
+      "Configure your StellarPOD store — wallet, webhook endpoints, default markup and notification preferences.",
+    path: "/settings",
+    noIndex: true,
+  });
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  await requireUser(request);
+  return json({});
+}
 
 export async function action({ request }: ActionFunctionArgs) {
+  await requireUser(request);
   const formData = await request.formData();
   const settings = {
     storeName: formData.get("storeName") as string,

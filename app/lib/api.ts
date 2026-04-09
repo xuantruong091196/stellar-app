@@ -6,6 +6,7 @@ interface ApiOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   token?: string;
+  walletAddress?: string;
   headers?: Record<string, string>;
 }
 
@@ -19,7 +20,13 @@ export async function api<T = unknown>(
   endpoint: string,
   options: ApiOptions = {}
 ): Promise<ApiResponse<T>> {
-  const { method = "GET", body, token, headers: customHeaders } = options;
+  const {
+    method = "GET",
+    body,
+    token,
+    walletAddress,
+    headers: customHeaders,
+  } = options;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -27,6 +34,10 @@ export async function api<T = unknown>(
     "X-Dev-Store": "demo-store",
     ...customHeaders,
   };
+
+  if (walletAddress) {
+    headers["X-Wallet-Address"] = walletAddress;
+  }
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
@@ -59,18 +70,29 @@ export async function api<T = unknown>(
   }
 }
 
-// Convenience methods
-export const apiGet = <T>(endpoint: string, token?: string) =>
-  api<T>(endpoint, { method: "GET", token });
+// Convenience methods. Pass the wallet address (from `requireUser`) so the
+// API receives an `X-Wallet-Address` header — the backend can later be
+// upgraded to require this for authenticated endpoints.
+export const apiGet = <T>(endpoint: string, walletAddress?: string) =>
+  api<T>(endpoint, { method: "GET", walletAddress });
 
-export const apiPost = <T>(endpoint: string, body: unknown, token?: string) =>
-  api<T>(endpoint, { method: "POST", body, token });
+export const apiPost = <T>(
+  endpoint: string,
+  body: unknown,
+  walletAddress?: string,
+) => api<T>(endpoint, { method: "POST", body, walletAddress });
 
-export const apiPut = <T>(endpoint: string, body: unknown, token?: string) =>
-  api<T>(endpoint, { method: "PUT", body, token });
+export const apiPut = <T>(
+  endpoint: string,
+  body: unknown,
+  walletAddress?: string,
+) => api<T>(endpoint, { method: "PUT", body, walletAddress });
 
-export const apiPatch = <T>(endpoint: string, body: unknown, token?: string) =>
-  api<T>(endpoint, { method: "PATCH", body, token });
+export const apiPatch = <T>(
+  endpoint: string,
+  body: unknown,
+  walletAddress?: string,
+) => api<T>(endpoint, { method: "PATCH", body, walletAddress });
 
-export const apiDelete = <T>(endpoint: string, token?: string) =>
-  api<T>(endpoint, { method: "DELETE", token });
+export const apiDelete = <T>(endpoint: string, walletAddress?: string) =>
+  api<T>(endpoint, { method: "DELETE", walletAddress });

@@ -7,19 +7,29 @@ import type {
 import { json } from "@remix-run/node";
 import { useLoaderData, useFetcher, Link } from "@remix-run/react";
 import { apiGet, apiPost } from "~/lib/api";
+import { requireUser } from "~/lib/session.server";
 import type { Order, EscrowStatus, ProviderOrder } from "~/lib/types";
 import { PageHeader } from "~/components/ui/PageHeader";
 import { Button } from "~/components/ui/Button";
 import { OrderPill, EscrowPill, Pill } from "~/components/ui/StatusPill";
+import { pageMeta } from "~/lib/seo";
 
-export const meta: MetaFunction = () => [
-  { title: "StellarPOD — Order Detail" },
-];
+export const meta: MetaFunction = () =>
+  pageMeta({
+    title: "Order Detail",
+    description:
+      "Inspect a single order — escrow state, provider assignment, shipping updates and full on-chain transaction history.",
+    noIndex: true,
+  });
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const { orderId } = params;
   if (!orderId) throw new Response("Order ID is required", { status: 400 });
-  const res = await apiGet<Order>(`/orders/detail/${orderId}`);
+  const res = await apiGet<Order>(
+    `/orders/detail/${orderId}`,
+    walletAddress,
+  );
   if (res.error) throw new Response(res.error, { status: res.status || 500 });
   const order = res.data!;
   const providerOrders: ProviderOrder[] =
@@ -28,6 +38,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
+  const walletAddress = await requireUser(request);
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
   const { orderId } = params;
@@ -38,7 +49,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const escrowId = formData.get("escrowId") as string;
       if (!escrowId)
         return json({ error: "Escrow ID is required" }, { status: 400 });
-      const res = await apiPost(`/escrow/${escrowId}/release`, {});
+      const res = await apiPost(
+        `/escrow/${escrowId}/release`,
+        {},
+        walletAddress,
+      );
       return res.error
         ? json({ error: res.error }, { status: res.status || 500 })
         : json({ success: true, message: "Escrow funds released successfully" });
@@ -48,16 +63,24 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const reason = formData.get("reason") as string;
       if (!escrowId)
         return json({ error: "Escrow ID is required" }, { status: 400 });
-      const res = await apiPost(`/escrow/${escrowId}/dispute`, {
-        raisedBy: "merchant",
-        reason: reason || "Dispute raised by merchant",
-      });
+      const res = await apiPost(
+        `/escrow/${escrowId}/dispute`,
+        {
+          raisedBy: "merchant",
+          reason: reason || "Dispute raised by merchant",
+        },
+        walletAddress,
+      );
       return res.error
         ? json({ error: res.error }, { status: res.status || 500 })
         : json({ success: true, message: "Dispute opened successfully" });
     }
     case "cancel": {
-      const res = await apiPost(`/orders/${orderId}/cancel`, {});
+      const res = await apiPost(
+        `/orders/${orderId}/cancel`,
+        {},
+        walletAddress,
+      );
       return res.error
         ? json({ error: res.error }, { status: res.status || 500 })
         : json({ success: true, message: "Order cancelled successfully" });
