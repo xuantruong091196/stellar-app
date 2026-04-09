@@ -78,11 +78,11 @@ export function AppShell({
           <Link to="/" className="flex items-center gap-3">
             <img
               src="/images/logo.png"
-              alt="StellarPOD logo"
+              alt="Stelo logo"
               className="w-9 h-9 rounded-xl object-contain"
             />
             <span className="text-xl font-bold bg-gradient-to-r from-[#6366F1] to-[#22D3EE] bg-clip-text text-transparent">
-              StellarPOD
+              Stelo
             </span>
           </Link>
         </div>
@@ -131,7 +131,7 @@ export function AppShell({
           <div className="flex items-center gap-3 mb-6">
             <img
               src="/images/logo.png"
-              alt="StellarPOD logo"
+              alt="Stelo logo"
               className="w-10 h-10 rounded-xl object-contain"
             />
             <div>

@@ -17,7 +17,7 @@ export const meta: MetaFunction = () =>
   pageMeta({
     title: "Settings",
     description:
-      "Configure your StellarPOD store — wallet, webhook endpoints, default markup and notification preferences.",
+      "Configure your Stelo store — wallet, webhook endpoints, default markup and notification preferences.",
     path: "/settings",
     noIndex: true,
   });
@@ -66,7 +66,7 @@ export default function Settings() {
     <>
       <PageHeader
         title="Settings"
-        subtitle="Configure your StellarPOD store"
+        subtitle="Configure your Stelo store"
       />
 
       {saved && (
@@ -154,7 +154,7 @@ export default function Settings() {
             <h2 className="text-lg font-bold font-headline">Pricing</h2>
             <p className="text-sm text-on-surface-variant mt-2">
               Configure pricing defaults. The platform fee is set by
-              StellarPOD.
+              Stelo.
             </p>
           </div>
           <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-6">

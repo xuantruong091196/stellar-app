@@ -25,7 +25,7 @@ export function buildSignInMessage({
     `${domain} wants you to sign in with your Stellar account:`,
     address,
     "",
-    "Issued by: StellarPOD — Mission Control",
+    "Issued by: Stelo — Mission Control",
     `Nonce: ${nonce}`,
     "",
     "By signing, you prove ownership of this wallet. No transactions are submitted.",

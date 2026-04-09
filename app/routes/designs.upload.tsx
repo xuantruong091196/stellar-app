@@ -17,7 +17,7 @@ export const meta: MetaFunction = () =>
   pageMeta({
     title: "Upload Design",
     description:
-      "Upload new artwork to your StellarPOD design library. High-resolution PNG, JPG and SVG supported.",
+      "Upload new artwork to your Stelo design library. High-resolution PNG, JPG and SVG supported.",
     path: "/designs/upload",
     noIndex: true,
   });

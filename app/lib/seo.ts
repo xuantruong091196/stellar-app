@@ -3,13 +3,13 @@
 // <title>, description, OpenGraph and Twitter tags.
 
 export const SITE = {
-  name: "StellarPOD",
+  name: "Stelo",
   tagline: "Mission Control for Stellar-powered Print-on-Demand",
   description:
-    "StellarPOD is a decentralised print-on-demand platform. Sell custom merch, accept USDC via Stellar escrow, and automate fulfilment with verified providers — no chargebacks, no middlemen.",
+    "Stelo is a decentralised print-on-demand platform. Sell custom merch, accept USDC via Stellar escrow, and automate fulfilment with verified providers — no chargebacks, no middlemen.",
   url: "https://stelo.life",
   locale: "en_US",
-  twitter: "@stellarpod",
+  twitter: "@stelo_life",
   logo: "/images/logo.png",
 } as const;
 

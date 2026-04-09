@@ -84,7 +84,7 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader
-        title="StellarPOD Dashboard"
+        title="Stelo Dashboard"
         subtitle="Your print-on-demand mission control"
       />
 

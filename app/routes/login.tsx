@@ -30,7 +30,7 @@ export const meta: MetaFunction = () =>
   pageMeta({
     title: "Sign In",
     description:
-      "Sign in to StellarPOD with your Stellar wallet. Passwordless, non-custodial authentication via Sign-In With Stellar.",
+      "Sign in to Stelo with your Stellar wallet. Passwordless, non-custodial authentication via Sign-In With Stellar.",
     path: "/login",
   });
 
@@ -279,11 +279,11 @@ export default function Login() {
           <div className="inline-flex items-center gap-3 mb-4">
             <img
               src="/images/logo.png"
-              alt="StellarPOD logo"
+              alt="Stelo logo"
               className="w-12 h-12 rounded-2xl object-contain shadow-lg"
             />
             <span className="text-2xl font-bold stellar-text-gradient font-headline">
-              StellarPOD
+              Stelo
             </span>
           </div>
           <h1 className="text-3xl font-headline font-bold">
