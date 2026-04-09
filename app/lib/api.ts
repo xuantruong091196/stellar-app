@@ -1,6 +1,27 @@
-const API_BASE_URL = typeof process !== "undefined"
-  ? process.env.STELLARPOD_API_URL || "http://localhost:3000"
-  : "http://localhost:3000";
+// Pick the API base URL based on where the code runs:
+//  - On the server (loaders/actions) use the internal Docker DNS via
+//    `STELLARPOD_API_URL` so Remix talks to the API container directly.
+//  - In the browser, read `window.ENV.PUBLIC_API_URL` that the root loader
+//    injects at render time (e.g. https://api.stelo.life).
+declare global {
+  interface Window {
+    ENV?: { PUBLIC_API_URL?: string };
+  }
+}
+
+function resolveApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    return window.ENV?.PUBLIC_API_URL || "http://localhost:8000";
+  }
+  if (typeof process !== "undefined") {
+    return (
+      process.env.STELLARPOD_API_URL ||
+      process.env.PUBLIC_API_URL ||
+      "http://localhost:8000"
+    );
+  }
+  return "http://localhost:8000";
+}
 
 interface ApiOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -44,7 +65,7 @@ export async function api<T = unknown>(
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${resolveApiBaseUrl()}${endpoint}`, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,

@@ -20,7 +20,19 @@ import { pageMeta, SITE } from "~/lib/seo";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const userAddress = await getUserAddress(request);
-  return json({ userAddress });
+  // Public API URL exposed to the browser via window.ENV.
+  // Server-side code uses STELLARPOD_API_URL (internal Docker DNS);
+  // the browser uses PUBLIC_API_URL (the public api.stelo.life endpoint).
+  const publicApiUrl =
+    process.env.PUBLIC_API_URL ||
+    process.env.STELLARPOD_API_URL ||
+    "http://localhost:8000";
+  return json({
+    userAddress,
+    ENV: {
+      PUBLIC_API_URL: publicApiUrl,
+    },
+  });
 }
 
 export const meta: MetaFunction = () =>
@@ -52,7 +64,7 @@ export const links: LinksFunction = () => [
 ];
 
 export default function App() {
-  const { userAddress } = useLoaderData<typeof loader>();
+  const { userAddress, ENV } = useLoaderData<typeof loader>();
   const location = useLocation();
   const isAuthRoute =
     location.pathname === "/login" || location.pathname === "/logout";
@@ -74,6 +86,12 @@ export default function App() {
           </AppShell>
         )}
         <ScrollRestoration />
+        <script
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{
+            __html: `window.ENV = ${JSON.stringify(ENV)};`,
+          }}
+        />
         <Scripts />
       </body>
     </html>
