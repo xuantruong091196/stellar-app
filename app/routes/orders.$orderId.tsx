@@ -19,9 +19,10 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remi
 import { json } from "@remix-run/node";
 import { useLoaderData, useNavigate, useFetcher } from "@remix-run/react";
 import { apiGet, apiPost } from "~/lib/api";
-import type { Order, OrderStatus } from "~/lib/types";
+import type { Order, OrderStatus, ProviderOrder } from "~/lib/types";
 import { ORDER_STATUS_LABELS } from "~/lib/types";
 import { EscrowStatusBadge } from "~/components/EscrowStatusBadge";
+import { ProviderOrderStatusBadge } from "~/components/ProviderOrderStatusBadge";
 
 export const meta: MetaFunction = () => {
   return [{ title: "StellarPOD - Order Detail" }];
@@ -39,7 +40,13 @@ export async function loader({ params }: LoaderFunctionArgs) {
     throw new Response(res.error, { status: res.status || 500 });
   }
 
-  return json({ order: res.data! });
+  // The order detail response includes providerOrders if they exist.
+  // If the API does not yet include providerOrders in the response,
+  // a dedicated endpoint like GET /orders/:orderId/provider-orders would be needed.
+  const order = res.data!;
+  const providerOrders: ProviderOrder[] = (order as Order & { providerOrders?: ProviderOrder[] }).providerOrders ?? [];
+
+  return json({ order, providerOrders });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -107,7 +114,7 @@ const orderStatusTone: Record<OrderStatus, "warning" | "info" | "success" | "cri
 };
 
 export default function OrderDetail() {
-  const { order } = useLoaderData<typeof loader>();
+  const { order, providerOrders } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher<{ error?: string; success?: boolean; message?: string }>();
   const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
@@ -293,6 +300,68 @@ export default function OrderDetail() {
                 </BlockStack>
               </Card>
             </Box>
+
+            {providerOrders.length > 0 && (
+              <Box paddingBlockStart="400">
+                <Card>
+                  <BlockStack gap="300">
+                    <Text as="h2" variant="headingMd">Provider Orders</Text>
+                    <Divider />
+                    {providerOrders.map((po: ProviderOrder) => (
+                      <BlockStack key={po.id} gap="200">
+                        <InlineStack align="space-between" blockAlign="center">
+                          <Text as="h3" variant="headingSm">
+                            {po.provider?.name || `Provider ${po.providerId.slice(0, 8)}`}
+                          </Text>
+                          <ProviderOrderStatusBadge status={po.status} />
+                        </InlineStack>
+                        <BlockStack gap="100">
+                          <InlineStack align="space-between">
+                            <Text as="span" variant="bodySm" tone="subdued">Base Cost</Text>
+                            <Text as="span" variant="bodySm">${po.totalBaseCost.toFixed(2)}</Text>
+                          </InlineStack>
+                          <InlineStack align="space-between">
+                            <Text as="span" variant="bodySm" tone="subdued">Platform Fee</Text>
+                            <Text as="span" variant="bodySm">${po.platformFee.toFixed(2)}</Text>
+                          </InlineStack>
+                          <InlineStack align="space-between">
+                            <Text as="span" variant="bodySm" tone="subdued">Tracking</Text>
+                            <Text as="span" variant="bodySm">
+                              {po.trackingNumber || "Not yet available"}
+                            </Text>
+                          </InlineStack>
+                          {po.trackingUrl && (
+                            <InlineStack align="space-between">
+                              <Text as="span" variant="bodySm" tone="subdued">Track</Text>
+                              <Button variant="plain" url={po.trackingUrl} external>
+                                Track Package
+                              </Button>
+                            </InlineStack>
+                          )}
+                          {po.shippedAt && (
+                            <InlineStack align="space-between">
+                              <Text as="span" variant="bodySm" tone="subdued">Shipped</Text>
+                              <Text as="span" variant="bodySm">
+                                {new Date(po.shippedAt).toLocaleDateString()}
+                              </Text>
+                            </InlineStack>
+                          )}
+                          {po.deliveredAt && (
+                            <InlineStack align="space-between">
+                              <Text as="span" variant="bodySm" tone="subdued">Delivered</Text>
+                              <Text as="span" variant="bodySm">
+                                {new Date(po.deliveredAt).toLocaleDateString()}
+                              </Text>
+                            </InlineStack>
+                          )}
+                        </BlockStack>
+                        <Divider />
+                      </BlockStack>
+                    ))}
+                  </BlockStack>
+                </Card>
+              </Box>
+            )}
           </Layout.Section>
 
           <Layout.Section variant="oneThird">

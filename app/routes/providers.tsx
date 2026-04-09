@@ -10,6 +10,8 @@ import {
   Text,
   Banner,
   EmptyState,
+  Button,
+  Box,
 } from "@shopify/polaris";
 import type { MetaFunction, LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
@@ -265,17 +267,27 @@ export default function Providers() {
         ) : (
           <InlineGrid columns={{ xs: 1, sm: 2, lg: 3 }} gap="400">
             {filteredProviders.map((provider) => (
-              <ProviderCard
-                key={provider.id}
-                id={provider.id}
-                name={provider.name}
-                country={provider.country}
-                rating={provider.rating}
-                specialties={provider.specialties}
-                productsAvailable={provider.totalOrders}
-                connected={connectedProviderIds.includes(provider.id)}
-                onConnect={handleConnect}
-              />
+              <BlockStack key={provider.id} gap="200">
+                <ProviderCard
+                  id={provider.id}
+                  name={provider.name}
+                  country={provider.country}
+                  rating={provider.rating}
+                  specialties={provider.specialties}
+                  productsAvailable={provider.totalOrders}
+                  connected={connectedProviderIds.includes(provider.id)}
+                  onConnect={handleConnect}
+                />
+                <Box paddingInlineStart="100" paddingInlineEnd="100">
+                  <Button
+                    variant="plain"
+                    onClick={() => navigate(`/catalog?providerId=${provider.id}`)}
+                    fullWidth
+                  >
+                    View Catalog
+                  </Button>
+                </Box>
+              </BlockStack>
             ))}
           </InlineGrid>
         )}

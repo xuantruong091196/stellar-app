@@ -4,9 +4,12 @@ import {
   Card,
   BlockStack,
   InlineGrid,
+  InlineStack,
   Text,
   EmptyState,
   Banner,
+  Button,
+  Box,
 } from "@shopify/polaris";
 import type { MetaFunction, LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
@@ -126,14 +129,24 @@ export default function Designs() {
             </Text>
             <InlineGrid columns={{ xs: 1, sm: 2, md: 3, lg: 4 }} gap="400">
               {designs.map((design) => (
-                <DesignCard
-                  key={design.id}
-                  id={design.id}
-                  name={design.name}
-                  thumbnailUrl={design.thumbnailUrl || design.fileUrl || "/images/placeholder-design.png"}
-                  copyrightStatus={deriveCopyrightStatus(design)}
-                  productCount={design.mockups?.length ?? 0}
-                />
+                <BlockStack key={design.id} gap="200">
+                  <DesignCard
+                    id={design.id}
+                    name={design.name}
+                    thumbnailUrl={design.thumbnailUrl || design.fileUrl || "/images/placeholder-design.png"}
+                    copyrightStatus={deriveCopyrightStatus(design)}
+                    productCount={design.mockups?.length ?? 0}
+                  />
+                  <Box paddingInlineStart="100" paddingInlineEnd="100">
+                    <Button
+                      variant="plain"
+                      onClick={() => navigate(`/products/new?designId=${design.id}`)}
+                      fullWidth
+                    >
+                      Create Product
+                    </Button>
+                  </Box>
+                </BlockStack>
               ))}
             </InlineGrid>
           </BlockStack>

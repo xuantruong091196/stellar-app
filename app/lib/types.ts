@@ -166,6 +166,112 @@ export interface Dispute {
   createdAt: string;
 }
 
+// ─── PROVIDER PRODUCT (Catalog) ───────────────
+
+export interface PrintArea {
+  name: string;
+  widthPx: number;
+  heightPx: number;
+  dpi: number;
+}
+
+export interface ProviderProduct {
+  id: string;
+  providerId: string;
+  productType: string;
+  name: string;
+  brand: string | null;
+  description: string | null;
+  baseCost: number;
+  printAreas: PrintArea[];
+  blankImages: Record<string, string>;
+  sizeChart: Record<string, Record<string, number>> | null;
+  weightGrams: number | null;
+  productionDays: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  variants?: ProviderProductVariant[];
+  provider?: Provider;
+}
+
+export interface ProviderProductVariant {
+  id: string;
+  providerProductId: string;
+  size: string;
+  color: string;
+  colorHex: string | null;
+  sku: string;
+  additionalCost: number;
+  inStock: boolean;
+}
+
+// ─── MERCHANT PRODUCT (Store ↔ Shopify) ───────
+
+export interface PrintConfig {
+  printArea: string;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+}
+
+export type MerchantProductStatus = 'draft' | 'publishing' | 'published' | 'error';
+
+export interface MerchantProduct {
+  id: string;
+  storeId: string;
+  designId: string;
+  providerProductId: string;
+  shopifyProductId: string | null;
+  shopifyProductGid: string | null;
+  title: string;
+  description: string | null;
+  retailPrice: number;
+  baseCost: number;
+  profitMargin: number;
+  printConfig: PrintConfig;
+  status: MerchantProductStatus;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  design?: Design;
+  providerProduct?: ProviderProduct;
+}
+
+export interface PricingBreakdown {
+  baseCost: number;
+  retailPrice: number;
+  platformFee: number;
+  platformFeeRate: number;
+  profitMargin: number;
+  profitPercent: number;
+}
+
+// ─── PROVIDER ORDER ───────────────────────────
+
+export type ProviderOrderStatus =
+  | 'pending' | 'accepted' | 'printing'
+  | 'quality_check' | 'packing' | 'shipped' | 'delivered';
+
+export interface ProviderOrder {
+  id: string;
+  orderId: string;
+  providerId: string;
+  status: ProviderOrderStatus;
+  totalBaseCost: number;
+  platformFee: number;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  trackingCompany: string | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  order?: Order;
+  provider?: Provider;
+}
+
 // ─── PAGINATED RESPONSE ───────────────────────
 
 export interface PaginatedResponse<T> {

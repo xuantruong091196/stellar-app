@@ -12,6 +12,7 @@ import {
   Text,
   Divider,
   Box,
+  Badge,
 } from "@shopify/polaris";
 import type { MetaFunction, ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
@@ -47,6 +48,7 @@ export default function Settings() {
   const [storeName, setStoreName] = useState("My Stellar Store");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [defaultMarkup, setDefaultMarkup] = useState("30");
   const [notifyOrders, setNotifyOrders] = useState(true);
   const [notifyEscrow, setNotifyEscrow] = useState(true);
   const [notifyShipping, setNotifyShipping] = useState(true);
@@ -116,6 +118,42 @@ export default function Settings() {
                     placeholder="https://your-server.com/webhook"
                     helpText="Optional: Receive real-time notifications for order and escrow events."
                   />
+                </BlockStack>
+              </Card>
+            </Layout.AnnotatedSection>
+
+            <Layout.AnnotatedSection
+              title="Pricing"
+              description="Configure pricing defaults for your products. The platform fee is set by StellarPOD."
+            >
+              <Card>
+                <BlockStack gap="400">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="span" variant="bodyMd">Platform Fee Rate</Text>
+                    <Badge tone="info">5%</Badge>
+                  </InlineStack>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    The platform fee is automatically deducted from each transaction and is not configurable.
+                  </Text>
+                  <Divider />
+                  <TextField
+                    label="Default Markup Percentage"
+                    name="defaultMarkup"
+                    type="number"
+                    value={defaultMarkup}
+                    onChange={setDefaultMarkup}
+                    autoComplete="off"
+                    suffix="%"
+                    helpText="Suggested markup applied when creating new products. You can override per product."
+                  />
+                  <Divider />
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="span" variant="bodyMd">Currency</Text>
+                    <Badge>USDC (Stellar)</Badge>
+                  </InlineStack>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    All transactions are settled in USDC on the Stellar network. Prices displayed to customers use USD equivalent.
+                  </Text>
                 </BlockStack>
               </Card>
             </Layout.AnnotatedSection>
