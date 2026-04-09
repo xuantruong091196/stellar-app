@@ -25,6 +25,7 @@ import type {
 import { PageHeader } from "~/components/ui/PageHeader";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { pageMeta } from "~/lib/seo";
+import { NumericFormat } from "react-number-format";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -40,6 +41,12 @@ const STORE_ID = "demo-store";
 export async function loader({ request }: LoaderFunctionArgs) {
   const walletAddress = await requireUser(request);
   return json({ walletAddress });
+}
+
+/** Safe number formatter — tolerates `undefined`/`NaN` from late API responses. */
+function fmt(n: number | null | undefined, digits = 2): string {
+  if (typeof n !== "number" || Number.isNaN(n)) return "—";
+  return n.toFixed(digits);
 }
 
 const STEP_LABELS = [
@@ -566,14 +573,17 @@ export default function CreateProduct() {
                   <span className="absolute left-0 top-3 text-on-surface-variant font-mono">
                     $
                   </span>
-                  <input
-                    type="number"
+                  <NumericFormat
                     value={retailPrice}
-                    onChange={(e) => handleRetailPriceChange(e.target.value)}
-                    step="0.01"
-                    min="0"
-                    className="ghost-input pl-6 font-mono text-lg"
+                    onValueChange={(values) =>
+                      handleRetailPriceChange(values.value)
+                    }
+                    thousandSeparator=","
+                    decimalScale={2}
+                    allowNegative={false}
                     placeholder="29.99"
+                    className="ghost-input pl-6 font-mono text-lg"
+                    inputMode="decimal"
                   />
                 </div>
               </div>
@@ -589,28 +599,30 @@ export default function CreateProduct() {
               <div className="bg-surface-container p-6 rounded-2xl space-y-3 text-sm">
                 <PricingRow
                   label="Retail Price"
-                  value={`$${pricing.retailPrice.toFixed(2)}`}
+                  value={`$${fmt(pricing.retailPrice)}`}
                   bold
                 />
                 <PricingRow
                   label="Base Cost"
-                  value={`-$${pricing.baseCost.toFixed(2)}`}
+                  value={`-$${fmt(pricing.baseCost)}`}
                 />
                 <PricingRow
                   label="Platform Fee (5%)"
-                  value={`-$${pricing.platformFee.toFixed(2)}`}
+                  value={`-$${fmt(pricing.platformFee)}`}
                 />
                 <div className="h-[1px] bg-outline-variant/20" />
                 <div className="flex justify-between items-center">
                   <span className="font-bold">Your Profit</span>
                   <span
                     className={`font-mono font-bold text-lg ${
-                      pricing.profitMargin >= 0 ? "text-green-400" : "text-red-400"
+                      (pricing.profitMargin ?? 0) >= 0
+                        ? "text-green-400"
+                        : "text-red-400"
                     }`}
                   >
-                    ${pricing.profitMargin.toFixed(2)}
+                    ${fmt(pricing.profitMargin)}
                     <span className="text-xs ml-1 opacity-70">
-                      ({pricing.profitPercent.toFixed(1)}%)
+                      ({fmt(pricing.profitPercent, 1)}%)
                     </span>
                   </span>
                 </div>
@@ -699,12 +711,12 @@ export default function CreateProduct() {
               />
               <PricingRow
                 label="Retail Price"
-                value={`$${parseFloat(retailPrice).toFixed(2)}`}
+                value={`$${fmt(parseFloat(retailPrice))}`}
                 bold
               />
               <PricingRow
                 label="Base Cost"
-                value={`$${selectedProduct.baseCost.toFixed(2)}`}
+                value={`$${fmt(selectedProduct.baseCost)}`}
               />
               <PricingRow label="Print Area" value={selectedPrintArea} />
               {pricing && (
@@ -712,10 +724,12 @@ export default function CreateProduct() {
                   <span className="font-bold">Estimated Profit</span>
                   <span
                     className={`font-mono font-bold ${
-                      pricing.profitMargin >= 0 ? "text-green-400" : "text-red-400"
+                      (pricing.profitMargin ?? 0) >= 0
+                        ? "text-green-400"
+                        : "text-red-400"
                     }`}
                   >
-                    ${pricing.profitMargin.toFixed(2)}
+                    ${fmt(pricing.profitMargin)}
                   </span>
                 </div>
               )}
