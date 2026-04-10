@@ -26,6 +26,7 @@ import { PageHeader } from "~/components/ui/PageHeader";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { pageMeta } from "~/lib/seo";
 import { NumericFormat } from "react-number-format";
+import { DesignEditor } from "~/components/editor/DesignEditor";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -149,6 +150,8 @@ export default function CreateProduct() {
   const [loadingDesigns, setLoadingDesigns] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
+  const [editorLayers, setEditorLayers] = useState<object | null>(null);
+  const [editorExportUrl, setEditorExportUrl] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -476,64 +479,45 @@ export default function CreateProduct() {
         </section>
       )}
 
-      {/* ─── Step 3: Configure & Price ─── */}
+      {/* ─── Step 3: Design Editor + Configure & Price ─── */}
       {step === 2 && selectedProduct && selectedDesign && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <section className="bg-surface-container-low rounded-2xl p-8 space-y-6">
-            <h2 className="text-xl font-bold font-headline">Selected Items</h2>
+        <div className="space-y-6">
+          {/* Design Editor */}
+          <DesignEditor
+            blankImageUrl={
+              Object.values(selectedProduct.blankImages)[0] || ""
+            }
+            printAreas={
+              selectedProduct.printAreas as {
+                name: string;
+                widthPx: number;
+                heightPx: number;
+                dpi: number;
+              }[]
+            }
+            designImageUrl={
+              selectedDesign.fileUrl || selectedDesign.thumbnailUrl || undefined
+            }
+            initialLayers={editorLayers}
+            apiBaseUrl={
+              typeof window !== "undefined"
+                ? window.ENV?.PUBLIC_API_URL || ""
+                : ""
+            }
+            onSave={(data) => {
+              setEditorLayers(data.layers);
+              setEditorExportUrl(data.exportDataUrl);
+              setSelectedPrintArea(data.printArea);
+            }}
+            isSaving={isSubmitting}
+          />
 
-            <div className="flex items-center gap-4 p-4 bg-surface-container rounded-xl">
-              <div className="w-16 h-16 rounded-xl bg-surface-container-highest flex items-center justify-center overflow-hidden">
-                {Object.values(selectedProduct.blankImages)[0] ? (
-                  <img
-                    src={Object.values(selectedProduct.blankImages)[0]}
-                    alt={selectedProduct.name}
-                    className="w-full h-full object-contain p-2"
-                  />
-                ) : (
-                  <span className="material-symbols-outlined text-2xl text-on-surface-variant/40">
-                    checkroom
-                  </span>
-                )}
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold">{selectedProduct.name}</h3>
-                <span className="px-2 py-0.5 rounded-full bg-[#6366F1]/10 text-[#6366F1] text-[10px] font-bold uppercase">
-                  {selectedProduct.productType}
-                </span>
-                <p className="text-xs text-on-surface-variant mt-1 font-mono">
-                  Base ${selectedProduct.baseCost.toFixed(2)}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 p-4 bg-surface-container rounded-xl">
-              <div className="w-16 h-16 rounded-xl bg-surface-container-highest flex items-center justify-center overflow-hidden">
-                {selectedDesign.thumbnailUrl || selectedDesign.fileUrl ? (
-                  <img
-                    src={selectedDesign.thumbnailUrl || selectedDesign.fileUrl}
-                    alt={selectedDesign.name}
-                    className="w-full h-full object-contain p-2"
-                  />
-                ) : (
-                  <span className="material-symbols-outlined text-2xl text-on-surface-variant/40">
-                    image
-                  </span>
-                )}
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold">{selectedDesign.name}</h3>
-                <p className="text-xs text-on-surface-variant">Design</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="bg-surface-container-low rounded-2xl p-8 space-y-6">
-            <h2 className="text-xl font-bold font-headline">
-              Configure Product
-            </h2>
-
-            <div className="space-y-5">
+          {/* Product Config + Pricing (below editor) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <section className="bg-surface-container-low rounded-2xl p-6 space-y-5">
+              <h2 className="text-lg font-bold font-headline">
+                Product Details
+              </h2>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
                   Product Title
@@ -546,24 +530,6 @@ export default function CreateProduct() {
                   placeholder="My Awesome Product"
                 />
               </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
-                  Print Area
-                </label>
-                <select
-                  value={selectedPrintArea}
-                  onChange={(e) => setSelectedPrintArea(e.target.value)}
-                  className="w-full bg-surface-container text-on-surface rounded-xl px-4 py-3 border-0 focus:ring-2 focus:ring-primary"
-                >
-                  {selectedProduct.printAreas.map((pa) => (
-                    <option key={pa.name} value={pa.name}>
-                      {pa.name} ({pa.widthPx}×{pa.heightPx}px @ {pa.dpi}dpi)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
                   Retail Price (USD)
@@ -586,81 +552,99 @@ export default function CreateProduct() {
                   />
                 </div>
               </div>
-            </div>
+            </section>
 
-            {pricingLoading && (
-              <p className="text-on-surface-variant text-sm">
-                Calculating pricing...
-              </p>
-            )}
-
-            {pricing && !pricingLoading && (
-              <div className="bg-surface-container p-6 rounded-2xl space-y-3 text-sm">
-                <PricingRow
-                  label="Retail Price"
-                  value={`$${fmt(pricing.retailPrice)}`}
-                  bold
-                />
-                <PricingRow
-                  label="Base Cost"
-                  value={`-$${fmt(pricing.baseCost)}`}
-                />
-                <PricingRow
-                  label="Platform Fee (5%)"
-                  value={`-$${fmt(pricing.platformFee)}`}
-                />
-                <div className="h-[1px] bg-outline-variant/20" />
-                <div className="flex justify-between items-center">
-                  <span className="font-bold">Your Profit</span>
-                  <span
-                    className={`font-mono font-bold text-lg ${
-                      (pricing.profitMargin ?? 0) >= 0
-                        ? "text-green-400"
-                        : "text-red-400"
-                    }`}
-                  >
-                    ${fmt(pricing.profitMargin)}
-                    <span className="text-xs ml-1 opacity-70">
-                      ({fmt(pricing.profitPercent, 1)}%)
+            <section className="bg-surface-container-low rounded-2xl p-6 space-y-4">
+              <h2 className="text-lg font-bold font-headline">
+                Pricing Breakdown
+              </h2>
+              {pricingLoading && (
+                <p className="text-on-surface-variant text-sm">
+                  Calculating...
+                </p>
+              )}
+              {pricing && !pricingLoading && (
+                <div className="space-y-3 text-sm">
+                  <PricingRow
+                    label="Retail Price"
+                    value={`$${fmt(pricing.retailPrice)}`}
+                    bold
+                  />
+                  <PricingRow
+                    label="Base Cost"
+                    value={`-$${fmt(pricing.baseCost)}`}
+                  />
+                  <PricingRow
+                    label="Platform Fee (5%)"
+                    value={`-$${fmt(pricing.platformFee)}`}
+                  />
+                  <div className="h-[1px] bg-outline-variant/20" />
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold">Your Profit</span>
+                    <span
+                      className={`font-mono font-bold text-lg ${
+                        (pricing.profitMargin ?? 0) >= 0
+                          ? "text-green-400"
+                          : "text-red-400"
+                      }`}
+                    >
+                      ${fmt(pricing.profitMargin)}
+                      <span className="text-xs ml-1 opacity-70">
+                        ({fmt(pricing.profitPercent, 1)}%)
+                      </span>
                     </span>
-                  </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </section>
+          </div>
 
-            <div className="flex items-center gap-3 justify-end">
+          {/* Action buttons */}
+          <div className="flex items-center gap-3 justify-end">
+            <Button
+              variant="secondary"
+              className="!py-2"
+              onClick={() => setStep(1)}
+            >
+              Back
+            </Button>
+            <fetcher.Form method="post">
+              <input type="hidden" name="intent" value="create-draft" />
+              <input type="hidden" name="designId" value={selectedDesign.id} />
+              <input
+                type="hidden"
+                name="providerProductId"
+                value={selectedProduct.id}
+              />
+              <input type="hidden" name="title" value={title} />
+              <input type="hidden" name="retailPrice" value={retailPrice} />
+              <input
+                type="hidden"
+                name="printArea"
+                value={selectedPrintArea}
+              />
+              <input
+                type="hidden"
+                name="printConfig"
+                value={JSON.stringify({
+                  printArea: selectedPrintArea,
+                  layers: editorLayers,
+                  exportUrl: editorExportUrl,
+                })}
+              />
               <Button
-                variant="secondary"
-                className="!py-2"
-                onClick={() => setStep(1)}
+                type="submit"
+                disabled={
+                  !title ||
+                  !retailPrice ||
+                  parseFloat(retailPrice) <= 0 ||
+                  isSubmitting
+                }
               >
-                Back
+                {isSubmitting ? "Creating..." : "Create Draft"}
               </Button>
-              <fetcher.Form method="post">
-                <input type="hidden" name="intent" value="create-draft" />
-                <input type="hidden" name="designId" value={selectedDesign.id} />
-                <input
-                  type="hidden"
-                  name="providerProductId"
-                  value={selectedProduct.id}
-                />
-                <input type="hidden" name="title" value={title} />
-                <input type="hidden" name="retailPrice" value={retailPrice} />
-                <input type="hidden" name="printArea" value={selectedPrintArea} />
-                <Button
-                  type="submit"
-                  disabled={
-                    !title ||
-                    !retailPrice ||
-                    parseFloat(retailPrice) <= 0 ||
-                    isSubmitting
-                  }
-                >
-                  {isSubmitting ? "Creating..." : "Create Draft"}
-                </Button>
-              </fetcher.Form>
-            </div>
-          </section>
+            </fetcher.Form>
+          </div>
         </div>
       )}
 
