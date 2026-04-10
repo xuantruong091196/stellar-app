@@ -26,13 +26,14 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
     const items: LayerItem[] = [];
     objects.forEach((obj, i) => {
       const name = (obj as any).name || "";
-      if (name === "__blank" || name === "__printArea") return;
+      if (name === "__printArea") return;
+      const isBlank = name === "__blank";
       items.push({
         index: i,
-        name: name || obj.type || `Object ${i}`,
+        name: isBlank ? "Product Image" : name || obj.type || `Object ${i}`,
         type: obj.type || "unknown",
         visible: obj.visible !== false,
-        locked: !obj.selectable,
+        locked: !obj.selectable || isBlank,
       });
     });
     setLayers(items.reverse()); // Top layers first
@@ -48,11 +49,10 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
     (index: number) => {
       if (!canvas) return;
       const obj = canvas.item(index);
-      if (obj) {
-        canvas.setActiveObject(obj);
-        canvas.renderAll();
-        setSelectedIndex(index);
-      }
+      if (!obj || !obj.selectable) return; // Don't select locked layers
+      canvas.setActiveObject(obj);
+      canvas.renderAll();
+      setSelectedIndex(index);
     },
     [canvas],
   );
@@ -128,6 +128,11 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
                 {getIcon(layer.type)}
               </span>
               <span className="flex-1 truncate">{layer.name}</span>
+              {layer.locked && (
+                <span className="material-symbols-outlined text-sm opacity-30" title="Locked">
+                  lock
+                </span>
+              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();

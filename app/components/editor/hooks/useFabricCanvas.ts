@@ -111,22 +111,6 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
         c.add(img);
         c.sendObjectToBack(img);
 
-        // Print area boundary
-        const zone = new fabric.Rect({
-          left: pa.x,
-          top: pa.y,
-          width: pa.displayWidth,
-          height: pa.displayHeight,
-          fill: "rgba(99,102,241,0.05)",
-          stroke: "#6366F1",
-          strokeDashArray: [8, 4],
-          strokeWidth: 1.5,
-          selectable: false,
-          evented: false,
-          name: "__printArea",
-        });
-        c.add(zone);
-
         // Snap guides (center)
         c.on("object:moving", (e) => {
           const obj = e.target;
