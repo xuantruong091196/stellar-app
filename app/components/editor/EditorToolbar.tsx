@@ -50,6 +50,10 @@ export function EditorToolbar({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Ignore shortcuts when user is typing in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) return;
+
       const mod = e.metaKey || e.ctrlKey;
 
       if (mod && e.key === "z" && !e.shiftKey) {
