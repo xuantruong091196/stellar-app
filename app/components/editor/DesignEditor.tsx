@@ -1,0 +1,319 @@
+import { useState, useCallback, useEffect } from "react";
+import { useFabricCanvas } from "./hooks/useFabricCanvas";
+import { useHistory } from "./hooks/useHistory";
+import { exportAtPrintDPI } from "./utils/export";
+import { EditorToolbar } from "./EditorToolbar";
+import { LayerPanel } from "./panels/LayerPanel";
+import { TextPanel } from "./panels/TextPanel";
+import { ShapesPanel } from "./panels/ShapesPanel";
+import { PropertiesPanel } from "./panels/PropertiesPanel";
+
+interface PrintAreaDef {
+  name: string;
+  widthPx: number;
+  heightPx: number;
+  dpi: number;
+}
+
+interface DesignEditorProps {
+  blankImageUrl: string;
+  printAreas: PrintAreaDef[];
+  designImageUrl?: string;
+  initialLayers?: object | null;
+  apiBaseUrl: string;
+  onSave: (data: {
+    printArea: string;
+    layers: object;
+    exportDataUrl: string;
+  }) => void;
+  isSaving?: boolean;
+}
+
+const CANVAS_WIDTH = 600;
+const CANVAS_HEIGHT = 680;
+
+type SideTab = "clipart" | "text" | "layers";
+
+export function DesignEditor({
+  blankImageUrl,
+  printAreas,
+  designImageUrl,
+  initialLayers,
+  apiBaseUrl,
+  onSave,
+  isSaving = false,
+}: DesignEditorProps) {
+  const [activePrintArea, setActivePrintArea] = useState(
+    printAreas[0]?.name || "front",
+  );
+  const [sideTab, setSideTab] = useState<SideTab>("clipart");
+  const [zoom, setZoom] = useState(1);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  const currentPrintArea = printAreas.find((p) => p.name === activePrintArea) ||
+    printAreas[0] || { name: "front", widthPx: 4200, heightPx: 4800, dpi: 300 };
+
+  const {
+    canvas,
+    isReady,
+    error,
+    displayPrintArea,
+    addImageToCanvas,
+    addTextToCanvas,
+    deleteSelected,
+  } = useFabricCanvas({
+    canvasElId: "stelo-editor-canvas",
+    canvasWidth: CANVAS_WIDTH,
+    canvasHeight: CANVAS_HEIGHT,
+    blankImageUrl,
+    printArea: currentPrintArea,
+    initialLayers,
+  });
+
+  const { undo, redo, saveBaseState, canUndo, canRedo, revision } =
+    useHistory(canvas);
+
+  // Save base state once canvas ready + add initial design
+  useEffect(() => {
+    if (!isReady || !canvas) return;
+    if (designImageUrl && !initialLayers) {
+      addImageToCanvas(designImageUrl).then(() => {
+        saveBaseState();
+      });
+    } else {
+      saveBaseState();
+    }
+  }, [isReady, canvas, designImageUrl, initialLayers, addImageToCanvas, saveBaseState]);
+
+  // Apply zoom
+  useEffect(() => {
+    if (!canvas) return;
+    canvas.setZoom(zoom);
+    canvas.setDimensions({
+      width: CANVAS_WIDTH * zoom,
+      height: CANVAS_HEIGHT * zoom,
+    });
+    canvas.renderAll();
+  }, [canvas, zoom]);
+
+  const [isEnhancing, setIsEnhancing] = useState(false);
+
+  const handleSave = useCallback(() => {
+    if (!canvas) return;
+    const layers = (canvas as any).toJSON(["name", "selectable", "evented"]);
+    const exportDataUrl = exportAtPrintDPI(canvas, displayPrintArea);
+    onSave({
+      printArea: activePrintArea,
+      layers,
+      exportDataUrl,
+    });
+  }, [canvas, displayPrintArea, activePrintArea, onSave]);
+
+  const handleAiEnhance = useCallback(async () => {
+    if (!canvas) return;
+    setIsEnhancing(true);
+    try {
+      // Export current canvas as base64 PNG
+      const dataUrl = canvas.toDataURL({ format: "png", quality: 1, multiplier: 1 });
+      const base64 = dataUrl.split(",")[1];
+
+      const res = await fetch(`${apiBaseUrl}/clipart/ai-enhance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: base64,
+          prompt:
+            "highly detailed, professional vector illustration, smooth lines, flat design, print-ready, cohesive art style",
+          strength: 0.5,
+          upscale: "2x",
+        }),
+      });
+
+      if (!res.ok) throw new Error("AI enhance failed");
+      const data = await res.json();
+
+      if (data.imageUrl) {
+        // Replace canvas content with AI-enhanced image
+        const fabric = await import("fabric");
+        const aiImg = await fabric.FabricImage.fromURL(data.imageUrl, {
+          crossOrigin: "anonymous",
+        });
+        // Scale to fit print area
+        const scale = Math.min(
+          displayPrintArea.displayWidth / aiImg.width!,
+          displayPrintArea.displayHeight / aiImg.height!,
+        );
+        aiImg.set({
+          scaleX: scale,
+          scaleY: scale,
+          left:
+            displayPrintArea.x +
+            (displayPrintArea.displayWidth - aiImg.width! * scale) / 2,
+          top:
+            displayPrintArea.y +
+            (displayPrintArea.displayHeight - aiImg.height! * scale) / 2,
+          name: "ai-enhanced",
+        });
+
+        // Remove old design objects (keep blank + print area)
+        const toRemove = canvas
+          .getObjects()
+          .filter(
+            (o) =>
+              (o as any).name !== "__blank" &&
+              (o as any).name !== "__printArea",
+          );
+        toRemove.forEach((o) => canvas.remove(o));
+
+        canvas.add(aiImg);
+        canvas.setActiveObject(aiImg);
+        canvas.renderAll();
+      }
+    } catch (err) {
+      alert(
+        err instanceof Error ? err.message : "AI enhancement failed. Try again.",
+      );
+    } finally {
+      setIsEnhancing(false);
+    }
+  }, [canvas, apiBaseUrl, displayPrintArea]);
+
+  // Mobile read-only
+  if (isMobile) {
+    return (
+      <div className="bg-surface-container-low rounded-2xl p-6 text-center space-y-4">
+        <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">
+          desktop_windows
+        </span>
+        <h3 className="font-bold font-headline">Desktop Required</h3>
+        <p className="text-sm text-on-surface-variant">
+          The design editor requires a desktop browser. Please open this page on
+          a computer to customize your product.
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-6 py-4 rounded-2xl">
+        <p className="text-sm font-bold">Editor failed to load</p>
+        <p className="text-xs opacity-80">{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Toolbar */}
+      <EditorToolbar
+        canvas={canvas}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
+        onSave={handleSave}
+        onAiEnhance={handleAiEnhance}
+        isEnhancing={isEnhancing}
+        isSaving={isSaving}
+        zoom={zoom}
+        onZoomChange={setZoom}
+      />
+
+      <div className="flex gap-3">
+        {/* Left sidebar: tabs */}
+        <div className="w-[220px] flex-shrink-0 bg-surface-container-low rounded-2xl p-3 space-y-3">
+          {/* Print zone selector */}
+          {printAreas.length > 1 && (
+            <div className="flex gap-1">
+              {printAreas.map((pa) => (
+                <button
+                  key={pa.name}
+                  onClick={() => setActivePrintArea(pa.name)}
+                  className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                    activePrintArea === pa.name
+                      ? "stellar-gradient text-white"
+                      : "bg-surface-container-high text-on-surface-variant hover:text-on-surface"
+                  }`}
+                >
+                  {pa.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Tab switcher */}
+          <div className="flex gap-1 bg-surface-container rounded-lg p-0.5">
+            {(
+              [
+                { id: "clipart", icon: "palette", label: "Clipart" },
+                { id: "text", icon: "text_fields", label: "Text" },
+                { id: "layers", icon: "layers", label: "Layers" },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setSideTab(tab.id)}
+                className={`flex-1 py-1.5 rounded-md text-[10px] font-bold flex items-center justify-center gap-1 transition-colors ${
+                  sideTab === tab.id
+                    ? "bg-primary/20 text-primary"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                <span className="material-symbols-outlined text-xs">
+                  {tab.icon}
+                </span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Panel content */}
+          {sideTab === "clipart" && (
+            <ShapesPanel
+              onAddImage={addImageToCanvas}
+              apiBaseUrl={apiBaseUrl}
+            />
+          )}
+          {sideTab === "text" && <TextPanel onAddText={addTextToCanvas} />}
+          {sideTab === "layers" && (
+            <LayerPanel
+              canvas={canvas}
+              revision={revision}
+              onDelete={deleteSelected}
+            />
+          )}
+        </div>
+
+        {/* Center: Canvas */}
+        <div className="flex-1 flex items-center justify-center bg-surface-container-low rounded-2xl p-4 overflow-auto">
+          {!isReady && (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+              <p className="text-xs text-on-surface-variant">
+                Loading editor...
+              </p>
+            </div>
+          )}
+          <canvas
+            id="stelo-editor-canvas"
+            className={isReady ? "" : "hidden"}
+          />
+        </div>
+
+        {/* Right: Properties */}
+        <div className="w-[220px] flex-shrink-0 bg-surface-container-low rounded-2xl p-3">
+          <PropertiesPanel canvas={canvas} revision={revision} />
+        </div>
+      </div>
+    </div>
+  );
+}
