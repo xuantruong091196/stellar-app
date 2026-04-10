@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useSearchParams, Link } from "@remix-run/react";
-import { apiGet } from "~/lib/api";
+import { apiGet , deriveStoreId } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type { Order, PaginatedResponse, OrderStatus } from "~/lib/types";
 import { ORDER_STATUS_LABELS } from "~/lib/types";
@@ -20,7 +20,6 @@ export const meta: MetaFunction = () =>
     noIndex: true,
   });
 
-const STORE_ID = "demo-store";
 
 const STATUS_FILTERS: (OrderStatus | "")[] = [
   "",
@@ -39,7 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const page = url.searchParams.get("page") || "1";
   const query = url.searchParams.get("q") || "";
 
-  let endpoint = `/orders/${STORE_ID}?page=${page}&limit=20`;
+  let endpoint = `/orders/${deriveStoreId(walletAddress)}?page=${page}&limit=20`;
   if (status) endpoint += `&status=${status}`;
 
   const res = await apiGet<PaginatedResponse<Order>>(endpoint, walletAddress);

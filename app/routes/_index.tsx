@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { apiGet } from "~/lib/api";
+import { apiGet , deriveStoreId } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type {
   Order,
@@ -23,15 +23,14 @@ export const meta: MetaFunction = () =>
     noIndex: true,
   });
 
-const STORE_ID = "demo-store";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const walletAddress = await requireUser(request);
   const [ordersRes, escrowsRes, productsRes] = await Promise.all([
-    apiGet<PaginatedResponse<Order>>(`/orders/${STORE_ID}?limit=5`, walletAddress),
-    apiGet<PaginatedResponse<Escrow>>(`/escrow/store/${STORE_ID}?limit=5`, walletAddress),
+    apiGet<PaginatedResponse<Order>>(`/orders/${deriveStoreId(walletAddress)}?limit=5`, walletAddress),
+    apiGet<PaginatedResponse<Escrow>>(`/escrow/store/${deriveStoreId(walletAddress)}?limit=5`, walletAddress),
     apiGet<PaginatedResponse<MerchantProduct>>(
-      `/products/store/${STORE_ID}?limit=100`,
+      `/products/store/${deriveStoreId(walletAddress)}?limit=100`,
       walletAddress,
     ),
   ]);

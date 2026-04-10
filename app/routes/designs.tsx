@@ -5,7 +5,7 @@ import type {
 } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useFetcher, Link } from "@remix-run/react";
-import { apiGet, apiDelete } from "~/lib/api";
+import { apiGet, apiDelete , deriveStoreId } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type { Design, PaginatedResponse } from "~/lib/types";
 import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
@@ -22,14 +22,13 @@ export const meta: MetaFunction = () =>
     noIndex: true,
   });
 
-const STORE_ID = "demo-store";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const walletAddress = await requireUser(request);
   const url = new URL(request.url);
   const page = url.searchParams.get("page") || "1";
   const res = await apiGet<PaginatedResponse<Design>>(
-    `/designs/${STORE_ID}?page=${page}&limit=20`,
+    `/designs/${deriveStoreId(walletAddress)}?page=${page}&limit=20`,
     walletAddress,
   );
   if (res.error)

@@ -12,7 +12,7 @@ import {
   useSearchParams,
   Link,
 } from "@remix-run/react";
-import { apiGet, apiPost } from "~/lib/api";
+import { apiGet, apiPost , deriveStoreId } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type {
   ProviderProduct,
@@ -36,7 +36,6 @@ export const meta: MetaFunction = () =>
     noIndex: true,
   });
 
-const STORE_ID = "demo-store";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const walletAddress = await requireUser(request);
@@ -81,7 +80,7 @@ export async function action({ request }: ActionFunctionArgs) {
     };
 
     const result = await apiPost<MerchantProduct>(
-      `/products/${STORE_ID}`,
+      `/products/${deriveStoreId(walletAddress)}`,
       {
         designId,
         providerProductId,
@@ -177,7 +176,7 @@ export default function CreateProduct() {
       async function loadDesigns() {
         setLoadingDesigns(true);
         const res = await apiGet<PaginatedResponse<Design>>(
-          `/designs/${STORE_ID}?limit=50`,
+          `/designs/${deriveStoreId(walletAddress)}?limit=50`,
           walletAddress,
         );
         if (res.error) setLoadError(res.error);

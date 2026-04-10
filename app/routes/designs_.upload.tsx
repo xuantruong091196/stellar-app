@@ -6,7 +6,7 @@ import type {
 } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useFetcher, Link } from "@remix-run/react";
-import { apiPost } from "~/lib/api";
+import { apiPost , deriveStoreId } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type { Design } from "~/lib/types";
 import { PageHeader } from "~/components/ui/PageHeader";
@@ -22,7 +22,6 @@ export const meta: MetaFunction = () =>
     noIndex: true,
   });
 
-const STORE_ID = "demo-store";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   await requireUser(request);
@@ -44,8 +43,25 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
+  // File validation
+  const ALLOWED_MIMES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+  if (!ALLOWED_MIMES.includes(mimetype)) {
+    return json(
+      { error: `Invalid file type: ${mimetype}. Allowed: PNG, JPEG, WebP, SVG.`, design: null },
+      { status: 400 },
+    );
+  }
+  const fileSizeBytes = Math.ceil(fileBase64.length * 0.75);
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+  if (fileSizeBytes > MAX_FILE_SIZE) {
+    return json(
+      { error: "File too large. Maximum size is 10 MB.", design: null },
+      { status: 400 },
+    );
+  }
+
   const result = await apiPost<Design>(
-    `/designs/${STORE_ID}`,
+    `/designs/${deriveStoreId(walletAddress)}`,
     {
       name,
       fileBase64,

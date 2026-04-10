@@ -3,8 +3,8 @@ import { Keypair, StrKey, hash } from "@stellar/stellar-sdk";
 
 // ─── Sign-In With Stellar (server-side verification) ──────────────
 
-/** 5-minute window for completing the sign-in handshake. */
-export const NONCE_TTL_MS = 5 * 60 * 1000;
+/** 3-minute window for completing the sign-in handshake. */
+export const NONCE_TTL_MS = 3 * 60 * 1000;
 
 /** Create a fresh hex nonce (32 bytes). */
 export function generateNonce(): string {
@@ -110,7 +110,6 @@ export function verifySignature({
       try {
         if (keypair.verify(c.bytes, signature)) {
           // eslint-disable-next-line no-console
-          console.log("[SIWS] verified with:", c.label);
           return true;
         }
       } catch {

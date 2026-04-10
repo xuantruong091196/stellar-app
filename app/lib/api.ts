@@ -23,6 +23,14 @@ function resolveApiBaseUrl(): string {
   return "http://localhost:8000";
 }
 
+/**
+ * Derive a deterministic store ID from a Stellar wallet address.
+ * Must match the server-side derivation in ShopifySessionGuard.
+ */
+export function deriveStoreId(walletAddress: string): string {
+  return `wallet-${walletAddress.slice(0, 16).toLowerCase()}`;
+}
+
 interface ApiOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
@@ -51,8 +59,6 @@ export async function api<T = unknown>(
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    // Dev mode bypass — auto-create a demo store in BE
-    "X-Dev-Store": "demo-store",
     ...customHeaders,
   };
 

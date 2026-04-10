@@ -6,7 +6,7 @@ import type {
 } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useSearchParams, useFetcher } from "@remix-run/react";
-import { apiGet, apiPost, apiDelete } from "~/lib/api";
+import { apiGet, apiPost, apiDelete , deriveStoreId } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type {
   Provider,
@@ -28,7 +28,6 @@ export const meta: MetaFunction = () =>
     noIndex: true,
   });
 
-const STORE_ID = "demo-store";
 
 const COUNTRIES = ["", "United States", "Germany", "Japan", "Brazil", "Sweden"];
 const SPECIALTIES = [
@@ -62,7 +61,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // Connected provider IDs are needed by both tabs
   const connectedPromise = apiGet<StoreProvider[]>(
-    `/providers/connected/${STORE_ID}`,
+    `/providers/connected/${deriveStoreId(walletAddress)}`,
     walletAddress,
   );
 
@@ -136,7 +135,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "connect") {
     const r = await apiPost(
       "/providers/connect",
-      { storeId: STORE_ID, providerId },
+      { storeId: deriveStoreId(walletAddress), providerId },
       walletAddress,
     );
     return r.error
@@ -145,7 +144,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   if (intent === "disconnect") {
     const r = await apiDelete(
-      `/providers/disconnect?storeId=${STORE_ID}&providerId=${providerId}`,
+      `/providers/disconnect?storeId=${deriveStoreId(walletAddress)}&providerId=${providerId}`,
       walletAddress,
     );
     return r.error

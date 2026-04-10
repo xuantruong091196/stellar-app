@@ -12,7 +12,7 @@ import {
   useFetcher,
   Link,
 } from "@remix-run/react";
-import { apiGet, apiPost, apiDelete } from "~/lib/api";
+import { apiGet, apiPost, apiDelete , deriveStoreId } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type {
   MerchantProduct,
@@ -32,7 +32,6 @@ export const meta: MetaFunction = () =>
     noIndex: true,
   });
 
-const STORE_ID = "demo-store";
 
 const TAB_MAP: Record<number, string> = { 0: "", 1: "draft", 2: "published" };
 
@@ -42,7 +41,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const status = url.searchParams.get("status") || "";
   const page = url.searchParams.get("page") || "1";
 
-  let endpoint = `/products/store/${STORE_ID}?page=${page}&limit=20`;
+  let endpoint = `/products/store/${deriveStoreId(walletAddress)}?page=${page}&limit=20`;
   if (status) endpoint += `&status=${status}`;
 
   const res = await apiGet<PaginatedResponse<MerchantProduct>>(

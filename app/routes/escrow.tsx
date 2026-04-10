@@ -5,7 +5,7 @@ import type {
 } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useFetcher, Link } from "@remix-run/react";
-import { apiGet, apiPost } from "~/lib/api";
+import { apiGet, apiPost , deriveStoreId } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type { Escrow, PaginatedResponse, EscrowStatus } from "~/lib/types";
 import { PageHeader, StatCard, EmptyState } from "~/components/ui/PageHeader";
@@ -21,7 +21,6 @@ export const meta: MetaFunction = () =>
     noIndex: true,
   });
 
-const STORE_ID = "demo-store";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const walletAddress = await requireUser(request);
@@ -29,7 +28,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const page = parseInt(url.searchParams.get("page") || "1", 10);
 
   const result = await apiGet<PaginatedResponse<Escrow>>(
-    `/escrow/store/${STORE_ID}?page=${page}&limit=20`,
+    `/escrow/store/${deriveStoreId(walletAddress)}?page=${page}&limit=20`,
     walletAddress,
   );
 

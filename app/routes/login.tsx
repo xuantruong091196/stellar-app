@@ -85,11 +85,6 @@ export async function action({ request }: ActionFunctionArgs) {
     const next = (formData.get("next") as string) || "/";
 
     // eslint-disable-next-line no-console
-    console.log("[SIWS verify]", {
-      address,
-      signatureLen: signature?.length,
-      signaturePreview: signature?.slice(0, 80),
-    });
 
     const pendingNonce = session.get("pendingNonce");
     const pendingAddress = session.get("pendingAddress");

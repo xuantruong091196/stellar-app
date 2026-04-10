@@ -40,7 +40,6 @@ export async function action({ request }: ActionFunctionArgs) {
     notifyShipping: formData.get("notifyShipping") === "on",
     notifyDisputes: formData.get("notifyDisputes") === "on",
   };
-  console.log("Settings received:", settings);
   return json({ success: true, error: null });
 }
 
