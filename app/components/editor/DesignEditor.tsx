@@ -45,13 +45,31 @@ export function DesignEditor({
   );
   const [sideTab, setSideTab] = useState<SideTab>("clipart");
   const [isMobile, setIsMobile] = useState(false);
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const [cssScale, setCssScale] = useState(1);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const initialImageLoaded = useRef(false);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // CSS-based responsive scaling
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      const available = rect.width - 16; // padding
+      const s = Math.min(1, available / 800);
+      setCssScale(s);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   const currentPrintArea = printAreas.find((p) => p.name === activePrintArea) ||
@@ -67,7 +85,6 @@ export function DesignEditor({
     deleteSelected,
   } = useFabricCanvas({
     canvasElId: "stelo-editor-canvas",
-    containerRef: canvasContainerRef,
     blankImageUrl,
     printArea: currentPrintArea,
     initialLayers,
@@ -76,8 +93,11 @@ export function DesignEditor({
   const { undo, redo, saveBaseState, canUndo, canRedo, revision } =
     useHistory(canvas);
 
+  // Load initial design image ONCE
   useEffect(() => {
-    if (!isReady || !canvas) return;
+    if (!isReady || !canvas || initialImageLoaded.current) return;
+    initialImageLoaded.current = true;
+
     if (designImageUrl && !initialLayers) {
       addImageToCanvas(designImageUrl).then(() => {
         saveBaseState();
@@ -85,7 +105,8 @@ export function DesignEditor({
     } else {
       saveBaseState();
     }
-  }, [isReady, canvas, designImageUrl, initialLayers, addImageToCanvas, saveBaseState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady, canvas]);
 
   const [isEnhancing, setIsEnhancing] = useState(false);
 
@@ -268,10 +289,10 @@ export function DesignEditor({
           )}
         </div>
 
-        {/* Center: Canvas — fills remaining space */}
+        {/* Center: Canvas — CSS scaled to fit */}
         <div
-          ref={canvasContainerRef}
-          className="flex-1 flex items-center justify-center bg-surface-container-low rounded-2xl p-4 min-h-[400px] overflow-hidden"
+          ref={wrapperRef}
+          className="flex-1 flex items-center justify-center bg-surface-container-low rounded-2xl p-2 overflow-hidden"
         >
           {!isReady && (
             <div className="flex flex-col items-center gap-3">
@@ -281,10 +302,18 @@ export function DesignEditor({
               </p>
             </div>
           )}
-          <canvas
-            id="stelo-editor-canvas"
+          <div
+            style={{
+              transform: `scale(${cssScale})`,
+              transformOrigin: "top center",
+              width: 800,
+              height: 700,
+              flexShrink: 0,
+            }}
             className={isReady ? "" : "hidden"}
-          />
+          >
+            <canvas id="stelo-editor-canvas" />
+          </div>
         </div>
 
         {/* Right: Properties */}

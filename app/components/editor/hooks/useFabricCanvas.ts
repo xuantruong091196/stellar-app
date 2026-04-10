@@ -15,19 +15,20 @@ export interface DisplayPrintArea {
 
 interface UseFabricCanvasOptions {
   canvasElId: string;
-  containerRef: React.RefObject<HTMLDivElement | null>;
   blankImageUrl: string;
   printArea: { name: string; widthPx: number; heightPx: number; dpi: number };
   initialLayers?: object | null;
 }
 
+// Fixed logical canvas size — visual scaling handled via CSS transform
+const CANVAS_W = 800;
+const CANVAS_H = 700;
+
 function computePrintArea(
-  canvasWidth: number,
-  canvasHeight: number,
   printArea: { name: string; widthPx: number; heightPx: number; dpi: number },
 ): DisplayPrintArea {
-  const maxWidth = canvasWidth * 0.6;
-  const maxHeight = canvasHeight * 0.7;
+  const maxWidth = CANVAS_W * 0.55;
+  const maxHeight = CANVAS_H * 0.65;
   const aspect = printArea.widthPx / printArea.heightPx;
   let dw = maxWidth;
   let dh = dw / aspect;
@@ -39,72 +40,24 @@ function computePrintArea(
     ...printArea,
     displayWidth: Math.round(dw),
     displayHeight: Math.round(dh),
-    x: Math.round((canvasWidth - dw) / 2),
-    y: Math.round((canvasHeight - dh) / 2),
+    x: Math.round((CANVAS_W - dw) / 2),
+    y: Math.round((CANVAS_H - dh) / 2),
     scale: printArea.widthPx / dw,
   };
 }
 
 export function useFabricCanvas(options: UseFabricCanvasOptions) {
-  const { canvasElId, containerRef, blankImageUrl, printArea, initialLayers } =
-    options;
+  const { canvasElId, blankImageUrl, printArea, initialLayers } = options;
 
   const [canvas, setCanvas] = useState<FabricCanvas | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 600, height: 510 });
   const initRef = useRef(false);
 
-  // Track container size with ResizeObserver
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const update = () => {
-      const rect = el.getBoundingClientRect();
-      const w = Math.max(300, Math.round(rect.width - 32));
-      const h = Math.max(400, Math.round(w * 0.85));
-      setCanvasSize((prev) => {
-        if (prev.width === w && prev.height === h) return prev;
-        return { width: w, height: h };
-      });
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [containerRef]);
-
-  const canvasWidth = canvasSize.width;
-  const canvasHeight = canvasSize.height;
-
-  const displayPrintArea = computePrintArea(canvasWidth, canvasHeight, printArea);
-
-  // Resize canvas when container size changes
-  useEffect(() => {
-    if (!canvas) return;
-    canvas.setDimensions({ width: canvasWidth, height: canvasHeight });
-
-    // Reposition blank image + print area zone
-    const objects = canvas.getObjects();
-    const blank = objects.find((o) => (o as any).name === "__blank");
-    if (blank) {
-      blank.scaleToWidth(canvasWidth);
-      const imgH = blank.getScaledHeight();
-      blank.set({ top: (canvasHeight - imgH) / 2 });
-      blank.setCoords();
-    }
-    const zone = objects.find((o) => (o as any).name === "__printArea");
-    if (zone) {
-      zone.set({
-        left: displayPrintArea.x,
-        top: displayPrintArea.y,
-        width: displayPrintArea.displayWidth,
-        height: displayPrintArea.displayHeight,
-      });
-      zone.setCoords();
-    }
-    canvas.renderAll();
-  }, [canvas, canvasWidth, canvasHeight, displayPrintArea]);
+  const pa = computePrintArea(printArea);
+  // Store in ref so callbacks always see latest without re-creating
+  const paRef = useRef(pa);
+  paRef.current = pa;
 
   useEffect(() => {
     if (initRef.current) return;
@@ -124,8 +77,8 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
         }
 
         const c = new fabric.Canvas(el, {
-          width: canvasWidth,
-          height: canvasHeight,
+          width: CANVAS_W,
+          height: CANVAS_H,
           backgroundColor: "#1a1a2e",
           preserveObjectStacking: true,
           selection: true,
@@ -145,20 +98,20 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
         const img = await fabric.FabricImage.fromURL(blankImageUrl, {
           crossOrigin: "anonymous",
         });
+        if (disposed) return;
         img.set({
           selectable: false,
           evented: false,
           name: "__blank",
         });
-        img.scaleToWidth(canvasWidth);
+        img.scaleToWidth(CANVAS_W);
         const imgHeight = img.getScaledHeight();
-        img.set({ top: (canvasHeight - imgHeight) / 2 });
+        img.set({ top: (CANVAS_H - imgHeight) / 2 });
         img.setCoords();
         c.add(img);
         c.sendObjectToBack(img);
 
-        // Add print area boundary (dashed rect, non-selectable)
-        const pa = computePrintArea(canvasWidth, canvasHeight, printArea);
+        // Print area boundary
         const zone = new fabric.Rect({
           left: pa.x,
           top: pa.y,
@@ -174,18 +127,19 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
         });
         c.add(zone);
 
-        // Center snap guides
+        // Snap guides (center)
         c.on("object:moving", (e) => {
           const obj = e.target;
           if (!obj) return;
-          const cx = pa.x + pa.displayWidth / 2;
-          const cy = pa.y + pa.displayHeight / 2;
+          const p = paRef.current;
+          const cx = p.x + p.displayWidth / 2;
+          const cy = p.y + p.displayHeight / 2;
           const objCx = obj.left! + (obj.width! * obj.scaleX!) / 2;
           const objCy = obj.top! + (obj.height! * obj.scaleY!) / 2;
-          if (Math.abs(objCx - cx) < 8) {
+          if (Math.abs(objCx - cx) < 6) {
             obj.set("left", cx - (obj.width! * obj.scaleX!) / 2);
           }
-          if (Math.abs(objCy - cy) < 8) {
+          if (Math.abs(objCy - cy) < 6) {
             obj.set("top", cy - (obj.height! * obj.scaleY!) / 2);
           }
         });
@@ -200,31 +154,26 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
     return () => {
       disposed = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addImageToCanvas = useCallback(
     async (imageUrl: string) => {
       if (!canvas) return;
+      const p = paRef.current;
       const fabric = await import("fabric");
       try {
         const img = await fabric.FabricImage.fromURL(imageUrl, {
           crossOrigin: "anonymous",
         });
-        const maxW = displayPrintArea.displayWidth * 0.8;
-        const maxH = displayPrintArea.displayHeight * 0.8;
-        const scale = Math.min(
-          maxW / (img.width || 100),
-          maxH / (img.height || 100),
-        );
+        const maxW = p.displayWidth * 0.8;
+        const maxH = p.displayHeight * 0.8;
+        const s = Math.min(maxW / (img.width || 100), maxH / (img.height || 100));
         img.set({
-          scaleX: scale,
-          scaleY: scale,
-          left:
-            displayPrintArea.x +
-            (displayPrintArea.displayWidth - (img.width || 100) * scale) / 2,
-          top:
-            displayPrintArea.y +
-            (displayPrintArea.displayHeight - (img.height || 100) * scale) / 2,
+          scaleX: s,
+          scaleY: s,
+          left: p.x + (p.displayWidth - (img.width || 100) * s) / 2,
+          top: p.y + (p.displayHeight - (img.height || 100) * s) / 2,
           selectable: true,
           evented: true,
         });
@@ -233,30 +182,35 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
         canvas.setActiveObject(img);
         canvas.requestRenderAll();
       } catch {
+        // Fallback: colored rect
         const rect = new fabric.Rect({
-          width: 200,
-          height: 200,
+          width: 150,
+          height: 150,
           fill: "#6366F1",
-          left: displayPrintArea.x + 50,
-          top: displayPrintArea.y + 50,
+          left: p.x + 40,
+          top: p.y + 40,
+          selectable: true,
+          evented: true,
         });
+        rect.setCoords();
         canvas.add(rect);
         canvas.requestRenderAll();
       }
     },
-    [canvas, displayPrintArea],
+    [canvas],
   );
 
   const addTextToCanvas = useCallback(
     async (text: string, fontFamily = "Inter") => {
       if (!canvas) return;
+      const p = paRef.current;
       const fabric = await import("fabric");
       const textObj = new fabric.IText(text, {
         fontFamily,
         fontSize: 32,
         fill: "#ffffff",
-        left: displayPrintArea.x + displayPrintArea.displayWidth / 2 - 50,
-        top: displayPrintArea.y + displayPrintArea.displayHeight / 2 - 20,
+        left: p.x + p.displayWidth / 2 - 50,
+        top: p.y + p.displayHeight / 2 - 20,
         editable: true,
         selectable: true,
         evented: true,
@@ -266,12 +220,13 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
       canvas.setActiveObject(textObj);
       canvas.requestRenderAll();
     },
-    [canvas, displayPrintArea],
+    [canvas],
   );
 
   const addSvgToCanvas = useCallback(
     async (svgString: string) => {
       if (!canvas) return;
+      const p = paRef.current;
       const fabric = await import("fabric");
       const objects = await fabric.loadSVGFromString(svgString);
       const group = fabric.util.groupSVGElements(
@@ -279,8 +234,8 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
         objects.options,
       );
       group.set({
-        left: displayPrintArea.x + displayPrintArea.displayWidth / 2 - 30,
-        top: displayPrintArea.y + displayPrintArea.displayHeight / 2 - 30,
+        left: p.x + p.displayWidth / 2 - 30,
+        top: p.y + p.displayHeight / 2 - 30,
         scaleX: 0.5,
         scaleY: 0.5,
         selectable: true,
@@ -291,18 +246,14 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
       canvas.setActiveObject(group);
       canvas.requestRenderAll();
     },
-    [canvas, displayPrintArea],
+    [canvas],
   );
 
   const deleteSelected = useCallback(() => {
     if (!canvas) return;
     const active = canvas.getActiveObjects();
     active.forEach((obj) => {
-      if (
-        (obj as any).name === "__blank" ||
-        (obj as any).name === "__printArea"
-      )
-        return;
+      if ((obj as any).name === "__blank" || (obj as any).name === "__printArea") return;
       canvas.remove(obj);
     });
     canvas.discardActiveObject();
@@ -313,7 +264,7 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
     canvas,
     isReady,
     error,
-    displayPrintArea,
+    displayPrintArea: pa,
     addImageToCanvas,
     addTextToCanvas,
     addSvgToCanvas,
