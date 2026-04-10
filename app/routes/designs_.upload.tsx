@@ -95,8 +95,24 @@ export default function UploadDesign() {
   const uploadedDesign =
     fetcher.data && "design" in fetcher.data ? fetcher.data.design : null;
 
+  const [fileError, setFileError] = useState<string | null>(null);
+
+  const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+  const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+
   const acceptFile = useCallback(
     (f: File) => {
+      setFileError(null);
+
+      if (!ALLOWED_TYPES.includes(f.type)) {
+        setFileError(`Invalid file type: ${f.type || f.name.split(".").pop()}. Use PNG, JPEG, WebP or SVG.`);
+        return;
+      }
+      if (f.size > MAX_SIZE) {
+        setFileError(`File too large (${(f.size / 1024 / 1024).toFixed(1)} MB). Max 10 MB.`);
+        return;
+      }
+
       setFile(f);
       setPreviewUrl(URL.createObjectURL(f));
       if (!designName) setDesignName(f.name.replace(/\.[^/.]+$/, ""));
@@ -148,10 +164,10 @@ export default function UploadDesign() {
         subtitle="Register your design on the Stellar blockchain"
       />
 
-      {error && (
+      {(error || fileError) && (
         <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-6 py-4 rounded-2xl">
           <p className="text-sm font-bold">Upload Error</p>
-          <p className="text-xs opacity-80">{error}</p>
+          <p className="text-xs opacity-80">{fileError || error}</p>
         </div>
       )}
 
@@ -203,7 +219,7 @@ export default function UploadDesign() {
               <input
                 ref={inputRef}
                 type="file"
-                accept="image/*"
+                accept=".png,.jpg,.jpeg,.webp,.svg"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
