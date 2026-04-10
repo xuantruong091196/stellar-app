@@ -28,7 +28,7 @@ function setSecurityHeaders(headers: Headers) {
         "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
-        "img-src 'self' data: blob: https://pub-d4f4b32f33134f9abad1d2f6faf51acf.r2.dev https://placehold.co https://images.printify.com https://*.printful.com https://*.gooten.com https://cdn.shopify.com",
+        "img-src 'self' data: blob: https://pub-d4f4b32f33134f9abad1d2f6faf51acf.r2.dev https://placehold.co https://images.printify.com https://*.printful.com https://*.gooten.com https://cdn.shopify.com https://*.freepik.com https://img.b2bpic.net https://*.freepikcompany.com",
         "connect-src 'self' https://api.stelo.life",
         "frame-ancestors 'none'",
       ].join("; "),
