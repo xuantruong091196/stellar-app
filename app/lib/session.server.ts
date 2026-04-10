@@ -37,7 +37,7 @@ export const sessionStorage = createCookieSessionStorage<
     name: "__stelo_session",
     httpOnly: true,
     path: "/",
-    sameSite: "strict",
+    sameSite: "lax",
     secrets: [SESSION_SECRET],
     secure: process.env.NODE_ENV === "production",
     maxAge: 60 * 60 * 24, // 24 hours

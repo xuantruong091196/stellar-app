@@ -1,0 +1,27 @@
+# Stelo POD — Shopify App Configuration
+# Docs: https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "d43b1787b5941142967341b5e0a9cdab"
+name = "SteloPOD"
+application_url = "https://stelo.life"
+embedded = false
+
+[webhooks]
+api_version = "2025-04"
+
+  [[webhooks.subscriptions]]
+  topics = ["app/uninstalled"]
+  uri = "https://api.stelo.life/webhooks/shopify"
+
+  [[webhooks.subscriptions]]
+  topics = ["products/update"]
+  uri = "https://api.stelo.life/webhooks/shopify"
+
+[access_scopes]
+scopes = "read_products,write_products,read_orders,write_orders,read_fulfillments,write_fulfillments"
+
+[auth]
+redirect_urls = [
+  "https://api.stelo.life/auth/shopify/callback",
+  "https://stelo.life/auth/callback",
+]
