@@ -61,7 +61,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // Connected provider IDs are needed by both tabs
   const connectedPromise = apiGet<StoreProvider[]>(
-    `/providers/connected/${deriveStoreId(walletAddress)}`,
+    `/providers/store/${deriveStoreId(walletAddress)}`,
     walletAddress,
   );
 
