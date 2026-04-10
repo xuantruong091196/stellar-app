@@ -534,23 +534,21 @@ export default function CreateProduct() {
                 <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
                   Retail Price (USD)
                 </label>
-                <div className="relative">
-                  <span className="absolute left-0 top-3 text-on-surface-variant font-mono">
-                    $
-                  </span>
-                  <NumericFormat
-                    value={retailPrice}
-                    onValueChange={(values) =>
-                      handleRetailPriceChange(values.value)
-                    }
-                    thousandSeparator=","
-                    decimalScale={2}
-                    allowNegative={false}
-                    placeholder="29.99"
-                    className="ghost-input pl-6 font-mono text-lg"
-                    inputMode="decimal"
-                  />
-                </div>
+                <NumericFormat
+                  value={retailPrice}
+                  onValueChange={(values) =>
+                    handleRetailPriceChange(values.value)
+                  }
+                  prefix="$ "
+                  suffix=" USD"
+                  thousandSeparator=","
+                  decimalScale={2}
+                  fixedDecimalScale
+                  allowNegative={false}
+                  placeholder="$ 0.00 USD"
+                  className="ghost-input font-mono text-lg"
+                  inputMode="decimal"
+                />
               </div>
             </section>
 
