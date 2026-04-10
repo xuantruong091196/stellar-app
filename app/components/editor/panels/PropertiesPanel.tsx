@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import type { Canvas as FabricCanvas } from "fabric";
 
 interface PropertiesState {
@@ -19,13 +19,30 @@ interface PropertiesPanelProps {
   revision: number;
 }
 
+/** Convert any CSS color string to #rrggbb for <input type="color"> */
+function toHex(color: string): string {
+  if (!color) return "#ffffff";
+  if (/^#[0-9a-fA-F]{6}$/.test(color)) return color;
+  if (/^#[0-9a-fA-F]{3}$/.test(color)) {
+    const [, r, g, b] = color.match(/^#(.)(.)(.)$/)!;
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+  const m = color.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (m) {
+    const hex = (n: string) => parseInt(n, 10).toString(16).padStart(2, "0");
+    return `#${hex(m[1])}${hex(m[2])}${hex(m[3])}`;
+  }
+  return "#ffffff";
+}
+
 export function PropertiesPanel({ canvas, revision }: PropertiesPanelProps) {
   const [props, setProps] = useState<PropertiesState | null>(null);
+  const rafRef = useRef(0);
 
   useEffect(() => {
     if (!canvas) return;
 
-    const update = () => {
+    const readProps = () => {
       const obj = canvas.getActiveObject();
       if (!obj || (obj as any).name === "__blank" || (obj as any).name === "__printArea") {
         setProps(null);
@@ -38,30 +55,38 @@ export function PropertiesPanel({ canvas, revision }: PropertiesPanelProps) {
         height: Math.round((obj.height || 0) * (obj.scaleY || 1)),
         angle: Math.round(obj.angle || 0),
         opacity: Math.round((obj.opacity ?? 1) * 100),
-        fill: typeof obj.fill === "string" ? obj.fill : "#ffffff",
+        fill: toHex(typeof obj.fill === "string" ? obj.fill : ""),
         fontSize: (obj as any).fontSize,
         fontFamily: (obj as any).fontFamily,
         type: obj.type || "object",
       });
     };
 
-    canvas.on("selection:created", update);
-    canvas.on("selection:updated", update);
+    // Throttled update for high-frequency events (moving/scaling/rotating)
+    const throttledUpdate = () => {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(readProps);
+    };
+
+    canvas.on("selection:created", readProps);
+    canvas.on("selection:updated", readProps);
     canvas.on("selection:cleared", () => setProps(null));
-    canvas.on("object:modified", update);
-    canvas.on("object:scaling", update);
-    canvas.on("object:moving", update);
-    canvas.on("object:rotating", update);
-    update();
+    canvas.on("object:modified", readProps);
+    // Use throttled version for high-frequency events
+    canvas.on("object:scaling", throttledUpdate);
+    canvas.on("object:moving", throttledUpdate);
+    canvas.on("object:rotating", throttledUpdate);
+    readProps();
 
     return () => {
-      canvas.off("selection:created", update);
-      canvas.off("selection:updated", update);
+      cancelAnimationFrame(rafRef.current);
+      canvas.off("selection:created", readProps);
+      canvas.off("selection:updated", readProps);
       canvas.off("selection:cleared");
-      canvas.off("object:modified", update);
-      canvas.off("object:scaling", update);
-      canvas.off("object:moving", update);
-      canvas.off("object:rotating", update);
+      canvas.off("object:modified", readProps);
+      canvas.off("object:scaling", throttledUpdate);
+      canvas.off("object:moving", throttledUpdate);
+      canvas.off("object:rotating", throttledUpdate);
     };
   }, [canvas, revision]);
 
@@ -80,7 +105,8 @@ export function PropertiesPanel({ canvas, revision }: PropertiesPanelProps) {
       } else {
         obj.set(key as any, value);
       }
-      canvas.renderAll();
+      obj.setCoords();
+      canvas.requestRenderAll();
     },
     [canvas],
   );
@@ -106,25 +132,21 @@ export function PropertiesPanel({ canvas, revision }: PropertiesPanelProps) {
         Properties
       </h3>
 
-      {/* Position */}
       <div className="grid grid-cols-2 gap-2">
         <PropField label="X" value={props.left} onChange={(v) => setProp("left", v)} />
         <PropField label="Y" value={props.top} onChange={(v) => setProp("top", v)} />
       </div>
 
-      {/* Size */}
       <div className="grid grid-cols-2 gap-2">
         <PropField label="W" value={props.width} onChange={(v) => setProp("width", v)} />
         <PropField label="H" value={props.height} onChange={(v) => setProp("height", v)} />
       </div>
 
-      {/* Rotation + Opacity */}
       <div className="grid grid-cols-2 gap-2">
         <PropField label="°" value={props.angle} onChange={(v) => setProp("angle", v)} min={-360} max={360} />
         <PropField label="%" value={props.opacity} onChange={(v) => setProp("opacity", v)} min={0} max={100} />
       </div>
 
-      {/* Color */}
       <div>
         <label className="text-[10px] text-on-surface-variant uppercase tracking-wider">Color</label>
         <div className="flex items-center gap-2 mt-1">
@@ -143,7 +165,6 @@ export function PropertiesPanel({ canvas, revision }: PropertiesPanelProps) {
         </div>
       </div>
 
-      {/* Text-specific */}
       {isText && props.fontSize && (
         <div>
           <PropField

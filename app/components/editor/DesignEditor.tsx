@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useFabricCanvas } from "./hooks/useFabricCanvas";
 import { useHistory } from "./hooks/useHistory";
 import { exportAtPrintDPI } from "./utils/export";
@@ -29,9 +29,6 @@ interface DesignEditorProps {
   isSaving?: boolean;
 }
 
-const CANVAS_WIDTH = 600;
-const CANVAS_HEIGHT = 680;
-
 type SideTab = "clipart" | "text" | "layers";
 
 export function DesignEditor({
@@ -47,10 +44,9 @@ export function DesignEditor({
     printAreas[0]?.name || "front",
   );
   const [sideTab, setSideTab] = useState<SideTab>("clipart");
-  const [zoom, setZoom] = useState(1);
   const [isMobile, setIsMobile] = useState(false);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
 
-  // Detect mobile
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
@@ -71,8 +67,7 @@ export function DesignEditor({
     deleteSelected,
   } = useFabricCanvas({
     canvasElId: "stelo-editor-canvas",
-    canvasWidth: CANVAS_WIDTH,
-    canvasHeight: CANVAS_HEIGHT,
+    containerRef: canvasContainerRef,
     blankImageUrl,
     printArea: currentPrintArea,
     initialLayers,
@@ -81,7 +76,6 @@ export function DesignEditor({
   const { undo, redo, saveBaseState, canUndo, canRedo, revision } =
     useHistory(canvas);
 
-  // Save base state once canvas ready + add initial design
   useEffect(() => {
     if (!isReady || !canvas) return;
     if (designImageUrl && !initialLayers) {
@@ -92,17 +86,6 @@ export function DesignEditor({
       saveBaseState();
     }
   }, [isReady, canvas, designImageUrl, initialLayers, addImageToCanvas, saveBaseState]);
-
-  // Apply zoom
-  useEffect(() => {
-    if (!canvas) return;
-    canvas.setZoom(zoom);
-    canvas.setDimensions({
-      width: CANVAS_WIDTH * zoom,
-      height: CANVAS_HEIGHT * zoom,
-    });
-    canvas.renderAll();
-  }, [canvas, zoom]);
 
   const [isEnhancing, setIsEnhancing] = useState(false);
 
@@ -121,7 +104,6 @@ export function DesignEditor({
     if (!canvas) return;
     setIsEnhancing(true);
     try {
-      // Export current canvas as base64 PNG
       const dataUrl = canvas.toDataURL({ format: "png", quality: 1, multiplier: 1 });
       const base64 = dataUrl.split(",")[1];
 
@@ -141,29 +123,29 @@ export function DesignEditor({
       const data = await res.json();
 
       if (data.imageUrl) {
-        // Replace canvas content with AI-enhanced image
         const fabric = await import("fabric");
         const aiImg = await fabric.FabricImage.fromURL(data.imageUrl, {
           crossOrigin: "anonymous",
         });
-        // Scale to fit print area
         const scale = Math.min(
-          displayPrintArea.displayWidth / aiImg.width!,
-          displayPrintArea.displayHeight / aiImg.height!,
+          displayPrintArea.displayWidth / (aiImg.width || 1),
+          displayPrintArea.displayHeight / (aiImg.height || 1),
         );
         aiImg.set({
           scaleX: scale,
           scaleY: scale,
           left:
             displayPrintArea.x +
-            (displayPrintArea.displayWidth - aiImg.width! * scale) / 2,
+            (displayPrintArea.displayWidth - (aiImg.width || 1) * scale) / 2,
           top:
             displayPrintArea.y +
-            (displayPrintArea.displayHeight - aiImg.height! * scale) / 2,
+            (displayPrintArea.displayHeight - (aiImg.height || 1) * scale) / 2,
           name: "ai-enhanced",
+          selectable: true,
+          evented: true,
         });
+        aiImg.setCoords();
 
-        // Remove old design objects (keep blank + print area)
         const toRemove = canvas
           .getObjects()
           .filter(
@@ -175,7 +157,7 @@ export function DesignEditor({
 
         canvas.add(aiImg);
         canvas.setActiveObject(aiImg);
-        canvas.renderAll();
+        canvas.requestRenderAll();
       }
     } catch (err) {
       alert(
@@ -186,7 +168,6 @@ export function DesignEditor({
     }
   }, [canvas, apiBaseUrl, displayPrintArea]);
 
-  // Mobile read-only
   if (isMobile) {
     return (
       <div className="bg-surface-container-low rounded-2xl p-6 text-center space-y-4">
@@ -213,7 +194,6 @@ export function DesignEditor({
 
   return (
     <div className="space-y-3">
-      {/* Toolbar */}
       <EditorToolbar
         canvas={canvas}
         canUndo={canUndo}
@@ -224,14 +204,11 @@ export function DesignEditor({
         onAiEnhance={handleAiEnhance}
         isEnhancing={isEnhancing}
         isSaving={isSaving}
-        zoom={zoom}
-        onZoomChange={setZoom}
       />
 
       <div className="flex gap-3">
-        {/* Left sidebar: tabs */}
+        {/* Left sidebar */}
         <div className="w-[220px] flex-shrink-0 bg-surface-container-low rounded-2xl p-3 space-y-3">
-          {/* Print zone selector */}
           {printAreas.length > 1 && (
             <div className="flex gap-1">
               {printAreas.map((pa) => (
@@ -250,7 +227,6 @@ export function DesignEditor({
             </div>
           )}
 
-          {/* Tab switcher */}
           <div className="flex gap-1 bg-surface-container rounded-lg p-0.5">
             {(
               [
@@ -276,7 +252,6 @@ export function DesignEditor({
             ))}
           </div>
 
-          {/* Panel content */}
           {sideTab === "clipart" && (
             <ShapesPanel
               onAddImage={addImageToCanvas}
@@ -293,8 +268,11 @@ export function DesignEditor({
           )}
         </div>
 
-        {/* Center: Canvas */}
-        <div className="flex-1 flex items-center justify-center bg-surface-container-low rounded-2xl p-4 overflow-auto">
+        {/* Center: Canvas — fills remaining space */}
+        <div
+          ref={canvasContainerRef}
+          className="flex-1 flex items-center justify-center bg-surface-container-low rounded-2xl p-4 min-h-[400px] overflow-hidden"
+        >
           {!isReady && (
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />

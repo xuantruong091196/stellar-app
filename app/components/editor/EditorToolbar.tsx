@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Canvas as FabricCanvas } from "fabric";
 
 interface EditorToolbarProps {
@@ -11,8 +11,6 @@ interface EditorToolbarProps {
   onAiEnhance?: () => void;
   isEnhancing?: boolean;
   isSaving: boolean;
-  zoom: number;
-  onZoomChange: (zoom: number) => void;
 }
 
 export function EditorToolbar({
@@ -25,39 +23,43 @@ export function EditorToolbar({
   onAiEnhance,
   isEnhancing = false,
   isSaving,
-  zoom,
-  onZoomChange,
 }: EditorToolbarProps) {
-  const zoomIn = useCallback(() => {
-    onZoomChange(Math.min(zoom + 0.1, 3));
-  }, [zoom, onZoomChange]);
+  const [zoom, setZoom] = useState(1);
 
-  const zoomOut = useCallback(() => {
-    onZoomChange(Math.max(zoom - 0.1, 0.3));
-  }, [zoom, onZoomChange]);
+  const applyZoom = useCallback(
+    (z: number) => {
+      setZoom(z);
+      if (!canvas) return;
+      canvas.setZoom(z);
+      const wrapper = canvas.getElement().parentElement;
+      if (wrapper) {
+        const baseW = wrapper.clientWidth;
+        const baseH = wrapper.clientHeight;
+        canvas.setDimensions({ width: baseW * z, height: baseH * z });
+      }
+      canvas.requestRenderAll();
+    },
+    [canvas],
+  );
 
-  const zoomFit = useCallback(() => {
-    onZoomChange(1);
-  }, [onZoomChange]);
+  const zoomIn = useCallback(() => applyZoom(Math.min(zoom + 0.1, 3)), [zoom, applyZoom]);
+  const zoomOut = useCallback(() => applyZoom(Math.max(zoom - 0.1, 0.3)), [zoom, applyZoom]);
+  const zoomFit = useCallback(() => applyZoom(1), [applyZoom]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
 
-      // Undo: Ctrl+Z
       if (mod && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         onUndo();
         return;
       }
-      // Redo: Ctrl+Y or Ctrl+Shift+Z
       if ((mod && e.key === "y") || (mod && e.key === "z" && e.shiftKey)) {
         e.preventDefault();
         onRedo();
         return;
       }
-      // Delete selected
       if ((e.key === "Delete" || e.key === "Backspace") && canvas) {
         const active = canvas.getActiveObject();
         if (active && !(active as any).isEditing) {
@@ -65,12 +67,11 @@ export function EditorToolbar({
           if (name !== "__blank" && name !== "__printArea") {
             canvas.remove(active);
             canvas.discardActiveObject();
-            canvas.renderAll();
+            canvas.requestRenderAll();
           }
         }
         return;
       }
-      // Zoom: + / -
       if (e.key === "=" || e.key === "+") {
         e.preventDefault();
         zoomIn();
@@ -81,13 +82,11 @@ export function EditorToolbar({
         zoomOut();
         return;
       }
-      // Fit: 0
       if (e.key === "0" && mod) {
         e.preventDefault();
         zoomFit();
         return;
       }
-      // Nudge with arrow keys
       if (canvas && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
         const obj = canvas.getActiveObject();
         if (!obj || (obj as any).isEditing) return;
@@ -99,7 +98,8 @@ export function EditorToolbar({
           case "ArrowLeft": obj.set("left", (obj.left || 0) - step); break;
           case "ArrowRight": obj.set("left", (obj.left || 0) + step); break;
         }
-        canvas.renderAll();
+        obj.setCoords();
+        canvas.requestRenderAll();
       }
     };
 
@@ -109,23 +109,11 @@ export function EditorToolbar({
 
   return (
     <div className="flex items-center justify-between bg-surface-container-low rounded-xl px-4 py-2">
-      {/* Left: Undo/Redo */}
       <div className="flex items-center gap-1">
-        <ToolBtn
-          icon="undo"
-          label="Undo (Ctrl+Z)"
-          onClick={onUndo}
-          disabled={!canUndo}
-        />
-        <ToolBtn
-          icon="redo"
-          label="Redo (Ctrl+Y)"
-          onClick={onRedo}
-          disabled={!canRedo}
-        />
+        <ToolBtn icon="undo" label="Undo (Ctrl+Z)" onClick={onUndo} disabled={!canUndo} />
+        <ToolBtn icon="redo" label="Redo (Ctrl+Y)" onClick={onRedo} disabled={!canRedo} />
       </div>
 
-      {/* Center: Zoom */}
       <div className="flex items-center gap-1">
         <ToolBtn icon="remove" label="Zoom out" onClick={zoomOut} />
         <span className="text-xs font-mono text-on-surface-variant w-12 text-center">
@@ -135,7 +123,6 @@ export function EditorToolbar({
         <ToolBtn icon="fit_screen" label="Fit (Ctrl+0)" onClick={zoomFit} />
       </div>
 
-      {/* Right: AI Enhance + Save */}
       <div className="flex items-center gap-2">
         {onAiEnhance && (
           <button

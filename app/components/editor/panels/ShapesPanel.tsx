@@ -22,7 +22,7 @@ export function ShapesPanel({ onAddImage, apiBaseUrl }: ShapesPanelProps) {
 
   const search = useCallback(
     async (q: string, p: number) => {
-      if (!q.trim()) {
+      if (!q.trim() || !apiBaseUrl) {
         setItems([]);
         return;
       }
@@ -30,10 +30,14 @@ export function ShapesPanel({ onAddImage, apiBaseUrl }: ShapesPanelProps) {
       try {
         const res = await fetch(
           `${apiBaseUrl}/clipart/search?q=${encodeURIComponent(q)}&page=${p}&limit=24`,
-          { headers: { "Content-Type": "application/json" } },
         );
         if (!res.ok) throw new Error("Search failed");
         const data = await res.json();
+        if (data.error) {
+          setItems([]);
+          setHasMore(false);
+          return;
+        }
         if (p === 1) {
           setItems(data.items || []);
         } else {
@@ -65,10 +69,13 @@ export function ShapesPanel({ onAddImage, apiBaseUrl }: ShapesPanelProps) {
     };
   }, [query, search]);
 
-  // Load default icons on mount
+  // Load default icons once apiBaseUrl is available
   useEffect(() => {
-    search("icon", 1);
-  }, [search]);
+    if (apiBaseUrl) {
+      setQuery("icon");
+      search("icon", 1);
+    }
+  }, [apiBaseUrl, search]);
 
   return (
     <div className="space-y-3">

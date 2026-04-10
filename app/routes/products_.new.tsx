@@ -563,6 +563,21 @@ export default function CreateProduct() {
                   Calculating...
                 </p>
               )}
+              {!pricing && !pricingLoading && (
+                <div className="text-center py-6 space-y-2">
+                  <span className="material-symbols-outlined text-3xl text-on-surface-variant/30">
+                    calculate
+                  </span>
+                  <p className="text-xs text-on-surface-variant/60">
+                    Enter a retail price to see your profit breakdown
+                  </p>
+                  {selectedProduct && (
+                    <p className="text-[10px] text-on-surface-variant/40">
+                      Base cost: ${fmt(selectedProduct.baseCost)} + 5% platform fee
+                    </p>
+                  )}
+                </div>
+              )}
               {pricing && !pricingLoading && (
                 <div className="space-y-3 text-sm">
                   <PricingRow
