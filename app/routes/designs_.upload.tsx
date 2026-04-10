@@ -1,11 +1,11 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type {
   MetaFunction,
   ActionFunctionArgs,
   LoaderFunctionArgs,
 } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useFetcher, Link } from "@remix-run/react";
+import { useFetcher, useNavigate, Link } from "@remix-run/react";
 import { apiPost , deriveStoreId } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type { Design } from "~/lib/types";
@@ -130,6 +130,8 @@ export default function UploadDesign() {
     [acceptFile],
   );
 
+  const navigate = useNavigate();
+
   const handleSubmit = useCallback(() => {
     if (!file || !designName.trim()) return;
     const reader = new FileReader();
@@ -144,6 +146,21 @@ export default function UploadDesign() {
     };
     reader.readAsDataURL(file);
   }, [file, designName, fetcher]);
+
+  // Auto-redirect to /designs after successful upload
+  useEffect(() => {
+    if (fetcher.state === "idle" && uploadedDesign) {
+      const timer = setTimeout(() => navigate("/designs"), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [fetcher.state, uploadedDesign, navigate]);
+
+  // Scroll to top when success/error appears
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [fetcher.state, fetcher.data]);
 
   return (
     <>
