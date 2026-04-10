@@ -109,16 +109,31 @@ export function DesignEditor({
   }, [isReady, canvas]);
 
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
 
   const handleSave = useCallback(() => {
     if (!canvas) return;
-    const layers = (canvas as any).toJSON(["name", "selectable", "evented"]);
-    const exportDataUrl = exportAtPrintDPI(canvas, displayPrintArea);
-    onSave({
-      printArea: activePrintArea,
-      layers,
-      exportDataUrl,
-    });
+    try {
+      const layers = (canvas as any).toJSON(["name", "selectable", "evented"]);
+      let exportDataUrl = "";
+      try {
+        exportDataUrl = exportAtPrintDPI(canvas, displayPrintArea);
+      } catch {
+        // Canvas tainted by cross-origin images — save layers without export
+        console.warn("Export failed (tainted canvas), saving layers only");
+      }
+      onSave({
+        printArea: activePrintArea,
+        layers,
+        exportDataUrl,
+      });
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch (err) {
+      console.error("Save failed:", err);
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    }
   }, [canvas, displayPrintArea, activePrintArea, onSave]);
 
   const handleAiEnhance = useCallback(async () => {
@@ -225,6 +240,7 @@ export function DesignEditor({
         onAiEnhance={handleAiEnhance}
         isEnhancing={isEnhancing}
         isSaving={isSaving}
+        saveStatus={saveStatus}
       />
 
       <div className="flex gap-3">

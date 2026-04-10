@@ -11,6 +11,7 @@ interface EditorToolbarProps {
   onAiEnhance?: () => void;
   isEnhancing?: boolean;
   isSaving: boolean;
+  saveStatus?: "idle" | "saved" | "error";
 }
 
 export function EditorToolbar({
@@ -23,6 +24,7 @@ export function EditorToolbar({
   onAiEnhance,
   isEnhancing = false,
   isSaving,
+  saveStatus = "idle",
 }: EditorToolbarProps) {
   const [zoom, setZoom] = useState(1);
 
@@ -140,12 +142,18 @@ export function EditorToolbar({
         <button
           onClick={onSave}
           disabled={isSaving}
-          className="stellar-gradient text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:brightness-110 disabled:opacity-50 transition-all"
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 hover:brightness-110 disabled:opacity-50 transition-all text-white ${
+            saveStatus === "saved"
+              ? "bg-green-500"
+              : saveStatus === "error"
+                ? "bg-red-500"
+                : "stellar-gradient"
+          }`}
         >
           <span className="material-symbols-outlined text-sm">
-            {isSaving ? "hourglass_empty" : "save"}
+            {saveStatus === "saved" ? "check_circle" : saveStatus === "error" ? "error" : isSaving ? "hourglass_empty" : "save"}
           </span>
-          {isSaving ? "Saving..." : "Save Design"}
+          {saveStatus === "saved" ? "Saved!" : saveStatus === "error" ? "Save Failed" : isSaving ? "Saving..." : "Save Design"}
         </button>
       </div>
     </div>
