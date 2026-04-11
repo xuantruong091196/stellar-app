@@ -152,12 +152,14 @@ export function AiToolsPanel({
     setState("processing");
     setErrorMsg("");
     startTimer();
+    abortRef.current = new AbortController();
 
     try {
       const res = await fetch(`${apiBaseUrl}/clipart/ai-remove-bg`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: base64 }),
+        signal: abortRef.current.signal,
       });
       if (!res.ok) throw new Error(`Remove BG failed: ${res.status}`);
       const data = await res.json();
@@ -183,6 +185,7 @@ export function AiToolsPanel({
       }
       setState("success");
     } catch (err: any) {
+      if (err.name === "AbortError") { setState("idle"); return; }
       setErrorMsg(err.message || "Remove BG failed");
       setState("error");
     } finally { stopTimer(); }
@@ -194,6 +197,7 @@ export function AiToolsPanel({
     setState("processing");
     setErrorMsg("");
     startTimer();
+    abortRef.current = new AbortController();
 
     try {
       const res = await fetch(`${apiBaseUrl}/clipart/ai-generate`, {
@@ -204,6 +208,7 @@ export function AiToolsPanel({
           style: generateStyle,
           transparentBg: generateBg === "transparent",
         }),
+        signal: abortRef.current.signal,
       });
       if (!res.ok) throw new Error(`Generate failed: ${res.status}`);
       const data = await res.json();
@@ -211,6 +216,7 @@ export function AiToolsPanel({
       if (data.imageUrl) await addImageToCanvas(data.imageUrl);
       setState("success");
     } catch (err: any) {
+      if (err.name === "AbortError") { setState("idle"); return; }
       setErrorMsg(err.message || "Generation failed");
       setState("error");
     } finally { stopTimer(); }
@@ -225,12 +231,14 @@ export function AiToolsPanel({
     setState("processing");
     setErrorMsg("");
     startTimer();
+    abortRef.current = new AbortController();
 
     try {
       const res = await fetch(`${apiBaseUrl}/clipart/ai-upscale`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: base64, scale: upscaleScale }),
+        signal: abortRef.current.signal,
       });
       if (!res.ok) throw new Error(`Upscale failed: ${res.status}`);
       const data = await res.json();
@@ -256,6 +264,7 @@ export function AiToolsPanel({
       }
       setState("success");
     } catch (err: any) {
+      if (err.name === "AbortError") { setState("idle"); return; }
       setErrorMsg(err.message || "Upscale failed");
       setState("error");
     } finally { stopTimer(); }

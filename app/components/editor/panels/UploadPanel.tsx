@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import DOMPurify from "dompurify";
 
 interface UploadPanelProps {
   onAddImage: (url: string) => void;
@@ -32,13 +33,34 @@ export function UploadPanel({ onAddImage }: UploadPanelProps) {
       }
       const reader = new FileReader();
       reader.onload = () => {
-        const dataUrl = reader.result as string;
+        let dataUrl = reader.result as string;
+
+        // Sanitize SVG files to prevent XSS
+        if (file.type === "image/svg+xml") {
+          try {
+            const svgText = atob(dataUrl.split(",")[1]);
+            const clean = DOMPurify.sanitize(svgText, {
+              USE_PROFILES: { svg: true, svgFilters: true },
+              ADD_TAGS: ["use"],
+              FORBID_TAGS: ["script", "foreignObject"],
+              FORBID_ATTR: ["onload", "onerror", "onclick", "onmouseover"],
+            });
+            const blob = new Blob([clean], { type: "image/svg+xml" });
+            dataUrl = URL.createObjectURL(blob);
+          } catch {
+            setError("Invalid SVG file.");
+            return;
+          }
+        }
+
         onAddImage(dataUrl);
-        const updated = [dataUrl, ...recentUploads].slice(0, 6);
-        setRecentUploads(updated);
-        try {
-          sessionStorage.setItem("stelo-recent-uploads", JSON.stringify(updated));
-        } catch { /* sessionStorage full */ }
+        setRecentUploads((prev) => {
+          const next = [dataUrl, ...prev].slice(0, 6);
+          try {
+            sessionStorage.setItem("stelo-recent-uploads", JSON.stringify(next));
+          } catch { /* sessionStorage full */ }
+          return next;
+        });
       };
       reader.readAsDataURL(file);
     },
