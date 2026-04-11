@@ -152,6 +152,7 @@ export default function CreateProduct() {
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const [editorLayers, setEditorLayers] = useState<object | null>(null);
   const [editorExportUrl, setEditorExportUrl] = useState<string | null>(null);
+  const [targetMargin, setTargetMargin] = useState(30);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -512,6 +513,14 @@ export default function CreateProduct() {
             isSaving={isSubmitting}
           />
 
+          {/* Design Resolution Checker */}
+          {selectedDesign && selectedProduct && selectedDesign.width && selectedProduct.printAreas.length > 0 && (
+            <DesignResolutionChecker
+              design={selectedDesign}
+              providerProduct={selectedProduct}
+            />
+          )}
+
           {/* Product Config + Pricing (below editor) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <section className="bg-surface-container-low rounded-2xl p-6 space-y-5">
@@ -551,6 +560,20 @@ export default function CreateProduct() {
                 />
               </div>
             </section>
+
+            {/* Profit Calculator — spans both columns */}
+            {selectedProduct && (
+              <div className="lg:col-span-2">
+                <ProfitCalculator
+                  baseCost={selectedProduct.baseCost}
+                  targetMargin={targetMargin}
+                  onMarginChange={setTargetMargin}
+                  onRetailPriceChange={(price) => {
+                    handleRetailPriceChange(price);
+                  }}
+                />
+              </div>
+            )}
 
             <section className="bg-surface-container-low rounded-2xl p-6 space-y-4">
               <h2 className="text-lg font-bold font-headline">
@@ -773,6 +796,222 @@ function PricingRow({
       >
         {value}
       </span>
+    </div>
+  );
+}
+
+/* ─── Profit Calculator Widget ─── */
+
+const PLATFORM_FEE_RATE = 0.05;
+
+function ProfitCalculator({
+  baseCost,
+  targetMargin,
+  onMarginChange,
+  onRetailPriceChange,
+}: {
+  baseCost: number;
+  targetMargin: number;
+  onMarginChange: (margin: number) => void;
+  onRetailPriceChange: (price: string) => void;
+}) {
+  const marginDecimal = targetMargin / 100;
+  const divisor = 1 - marginDecimal - PLATFORM_FEE_RATE;
+  const calculatedRetail = divisor > 0 ? baseCost / divisor : 0;
+  const platformFee = calculatedRetail * PLATFORM_FEE_RATE;
+  const profitPerUnit = calculatedRetail - baseCost - platformFee;
+
+  const rev10 = calculatedRetail * 10;
+  const rev50 = calculatedRetail * 50;
+  const rev100 = calculatedRetail * 100;
+
+  const profit10 = profitPerUnit * 10;
+  const profit50 = profitPerUnit * 50;
+  const profit100 = profitPerUnit * 100;
+
+  const isViable = divisor > 0;
+
+  return (
+    <section className="bg-surface-container-low rounded-2xl p-6 space-y-5 border border-outline-variant/10">
+      <div className="flex items-center gap-3">
+        <span className="material-symbols-outlined text-xl text-[#6366F1]">
+          trending_up
+        </span>
+        <h3 className="text-lg font-bold font-headline">Profit Calculator</h3>
+      </div>
+
+      {/* Margin slider */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+            Target Margin
+          </label>
+          <span className="font-mono font-bold text-lg text-[#6366F1]">
+            {targetMargin}%
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={targetMargin}
+          onChange={(e) => {
+            const m = parseInt(e.target.value, 10);
+            onMarginChange(m);
+            if (1 - m / 100 - PLATFORM_FEE_RATE > 0) {
+              const price = baseCost / (1 - m / 100 - PLATFORM_FEE_RATE);
+              onRetailPriceChange(price.toFixed(2));
+            }
+          }}
+          className="w-full h-2 rounded-full appearance-none cursor-pointer
+            bg-surface-container-highest
+            [&::-webkit-slider-thumb]:appearance-none
+            [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5
+            [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#6366F1]
+            [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer
+            [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5
+            [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#6366F1]
+            [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+        />
+        <div className="flex justify-between text-[10px] text-on-surface-variant/50 font-mono">
+          <span>0%</span>
+          <span>25%</span>
+          <span>50%</span>
+          <span>75%</span>
+          <span>95%</span>
+        </div>
+      </div>
+
+      {!isViable ? (
+        <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-4 py-3 rounded-xl text-xs">
+          Margin + platform fee exceeds 100%. Lower the target margin.
+        </div>
+      ) : (
+        <>
+          {/* Computed retail price + profit per unit */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-surface-container rounded-xl p-4 text-center">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">
+                Suggested Retail
+              </p>
+              <p className="font-mono font-bold text-xl text-on-surface">
+                ${fmt(calculatedRetail)}
+              </p>
+            </div>
+            <div className="bg-surface-container rounded-xl p-4 text-center">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">
+                Profit / Unit
+              </p>
+              <p
+                className={`font-mono font-bold text-xl ${
+                  profitPerUnit >= 0 ? "text-green-400" : "text-red-400"
+                }`}
+              >
+                ${fmt(profitPerUnit)}
+              </p>
+            </div>
+          </div>
+
+          {/* Monthly revenue projections */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-3">
+              Monthly Projections
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { orders: 10, revenue: rev10, profit: profit10 },
+                { orders: 50, revenue: rev50, profit: profit50 },
+                { orders: 100, revenue: rev100, profit: profit100 },
+              ].map(({ orders, revenue, profit }) => (
+                <div
+                  key={orders}
+                  className="bg-surface-container rounded-xl p-3 text-center space-y-1"
+                >
+                  <p className="text-[10px] text-on-surface-variant font-bold">
+                    {orders} orders/mo
+                  </p>
+                  <p className="font-mono text-xs text-on-surface-variant">
+                    ${fmt(revenue, 0)} rev
+                  </p>
+                  <p
+                    className={`font-mono font-bold text-sm ${
+                      profit >= 0 ? "text-green-400" : "text-red-400"
+                    }`}
+                  >
+                    ${fmt(profit, 0)} profit
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-[10px] text-on-surface-variant/40 text-center">
+            Base cost ${fmt(baseCost)} + 5% platform fee. Projections are estimates only.
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+/* ─── Design Resolution Checker Overlay ─── */
+
+function DesignResolutionChecker({
+  design,
+  providerProduct,
+}: {
+  design: Design;
+  providerProduct: ProviderProduct;
+}) {
+  const printArea = providerProduct.printAreas[0];
+  if (!printArea || !design.width) return null;
+
+  const ratio = design.width / printArea.widthPx;
+  const effectiveDpi = Math.round(ratio * printArea.dpi);
+
+  let badgeColor: string;
+  let badgeBg: string;
+  let badgeBorder: string;
+  let label: string;
+  let icon: string;
+
+  if (ratio >= 1.0) {
+    badgeColor = "text-green-300";
+    badgeBg = "bg-green-500/10";
+    badgeBorder = "border-green-400/20";
+    label = "Excellent quality";
+    icon = "check_circle";
+  } else if (ratio >= 0.5) {
+    badgeColor = "text-amber-300";
+    badgeBg = "bg-amber-400/10";
+    badgeBorder = "border-amber-400/20";
+    label = "Acceptable quality";
+    icon = "warning";
+  } else {
+    badgeColor = "text-red-300";
+    badgeBg = "bg-red-500/10";
+    badgeBorder = "border-red-400/20";
+    label = "Low quality — may look pixelated";
+    icon = "error";
+  }
+
+  return (
+    <div
+      className={`${badgeBg} border ${badgeBorder} ${badgeColor} px-4 py-3 rounded-xl flex items-center gap-3`}
+    >
+      <span className="material-symbols-outlined text-lg">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold">{label}</p>
+        <p className="text-xs opacity-70">
+          {design.width}px design / {printArea.widthPx}px print area
+          {" = "}
+          {effectiveDpi} DPI
+          <span className="opacity-50 ml-1">
+            (ratio {ratio.toFixed(2)}, print area native {printArea.dpi} DPI)
+          </span>
+        </p>
+      </div>
     </div>
   );
 }

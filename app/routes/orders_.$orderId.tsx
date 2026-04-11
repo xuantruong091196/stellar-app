@@ -8,10 +8,11 @@ import { json } from "@remix-run/node";
 import { useLoaderData, useFetcher, Link } from "@remix-run/react";
 import { apiGet, apiPost } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
-import type { Order, EscrowStatus, ProviderOrder } from "~/lib/types";
+import type { Order, Escrow, ProviderOrder } from "~/lib/types";
 import { PageHeader } from "~/components/ui/PageHeader";
 import { Button } from "~/components/ui/Button";
 import { OrderPill, EscrowPill, Pill } from "~/components/ui/StatusPill";
+import { EscrowTimeline, ViewOnStellarButton } from "~/components/EscrowTimeline";
 import { pageMeta } from "~/lib/seo";
 
 export const meta: MetaFunction = () =>
@@ -90,14 +91,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 }
 
-const ESCROW_TIMELINE: { key: EscrowStatus; label: string; tone: string }[] = [
-  { key: "LOCKED", label: "Locked", tone: "amber" },
-  { key: "RELEASING", label: "In Production", tone: "indigo" },
-  { key: "RELEASED", label: "Released", tone: "green" },
-];
-
 export default function OrderDetail() {
   const { order, providerOrders } = useLoaderData<typeof loader>();
+  const escrow: Escrow | null =
+    order.escrows && order.escrows.length > 0 ? order.escrows[0] : null;
   const fetcher = useFetcher<{
     error?: string;
     success?: boolean;
@@ -147,70 +144,38 @@ export default function OrderDetail() {
       )}
 
       {/* Escrow Timeline */}
-      {order.escrow && (
+      {escrow ? (
         <section className="bg-surface-container-low rounded-2xl p-8">
-          <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant mb-8">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant">
+              Escrow Timeline
+            </h3>
+            {escrow.lockTxHash && (
+              <ViewOnStellarButton lockTxHash={escrow.lockTxHash} />
+            )}
+          </div>
+          <EscrowTimeline escrow={escrow} />
+        </section>
+      ) : (
+        <section className="bg-surface-container-low rounded-2xl p-8">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant mb-4">
             Escrow Timeline
           </h3>
-          <div className="relative">
-            <div className="absolute left-0 right-0 top-5 h-1 bg-surface-container-highest rounded-full overflow-hidden">
-              <div
-                className="stellar-gradient h-full transition-all duration-500"
-                style={{
-                  width:
-                    order.escrow.status === "RELEASED"
-                      ? "100%"
-                      : order.escrow.status === "RELEASING"
-                        ? "66%"
-                        : "33%",
-                }}
-              />
-            </div>
-            <div className="relative flex justify-between">
-              {ESCROW_TIMELINE.map((s) => {
-                const reached =
-                  (s.key === "LOCKED" &&
-                    ["LOCKED", "RELEASING", "RELEASED"].includes(order.escrow!.status)) ||
-                  (s.key === "RELEASING" &&
-                    ["RELEASING", "RELEASED"].includes(order.escrow!.status)) ||
-                  (s.key === "RELEASED" && order.escrow!.status === "RELEASED");
-                return (
-                  <div key={s.key} className="flex flex-col items-center">
-                    <div
-                      className={
-                        reached
-                          ? "w-10 h-10 rounded-full stellar-gradient flex items-center justify-center text-white font-bold shadow-lg"
-                          : "w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface-variant"
-                      }
-                    >
-                      {reached ? (
-                        <span className="material-symbols-outlined text-base">
-                          check
-                        </span>
-                      ) : (
-                        <div className="w-2 h-2 rounded-full bg-current" />
-                      )}
-                    </div>
-                    <p className="text-xs font-bold mt-2">{s.label}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <p className="text-sm text-on-surface-variant">No escrow</p>
         </section>
       )}
 
-      {showRelease && order.escrow && (
+      {showRelease && escrow && (
         <div className="bg-amber-400/10 border border-amber-400/20 px-6 py-5 rounded-2xl space-y-3">
           <p className="font-bold text-amber-200">Confirm Escrow Release</p>
           <p className="text-sm text-amber-100/80">
-            This will release ${order.escrow.amountUsdc.toFixed(2)} USDC to the
+            This will release ${escrow.amountUsdc.toFixed(2)} USDC to the
             print provider. This action cannot be undone.
           </p>
           <div className="flex items-center gap-2">
             <fetcher.Form method="post">
               <input type="hidden" name="intent" value="release" />
-              <input type="hidden" name="escrowId" value={order.escrow.id} />
+              <input type="hidden" name="escrowId" value={escrow.id} />
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Releasing..." : "Confirm Release"}
               </Button>
@@ -222,7 +187,7 @@ export default function OrderDetail() {
         </div>
       )}
 
-      {showDispute && order.escrow && (
+      {showDispute && escrow && (
         <div className="bg-red-500/10 border border-red-400/20 px-6 py-5 rounded-2xl space-y-3">
           <p className="font-bold text-red-300">Open Dispute</p>
           <p className="text-sm text-red-200/80">
@@ -239,7 +204,7 @@ export default function OrderDetail() {
           <div className="flex items-center gap-2">
             <fetcher.Form method="post">
               <input type="hidden" name="intent" value="dispute" />
-              <input type="hidden" name="escrowId" value={order.escrow.id} />
+              <input type="hidden" name="escrowId" value={escrow.id} />
               <input type="hidden" name="reason" value={disputeReason} />
               <Button type="submit" variant="danger" disabled={isSubmitting}>
                 {isSubmitting ? "Submitting..." : "Confirm Dispute"}
@@ -426,17 +391,17 @@ export default function OrderDetail() {
         {/* RIGHT */}
         <div className="lg:col-span-4 space-y-8">
           {/* Escrow Card */}
-          {order.escrow ? (
+          {escrow ? (
             <div className="bg-surface-container-low p-6 rounded-2xl space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant">
                   Escrow
                 </h3>
-                <EscrowPill status={order.escrow.status} />
+                <EscrowPill status={escrow.status} />
               </div>
               <div className="text-center py-4">
                 <p className="font-mono text-4xl font-bold stellar-text-gradient">
-                  ${order.escrow.amountUsdc.toFixed(2)}
+                  ${escrow.amountUsdc.toFixed(2)}
                 </p>
                 <p className="text-xs text-on-surface-variant mt-1">
                   USDC Locked
@@ -445,43 +410,43 @@ export default function OrderDetail() {
               <div className="space-y-2 text-sm">
                 <Row
                   label="Platform Fee"
-                  value={`$${order.escrow.platformFee.toFixed(2)}`}
+                  value={`$${escrow.platformFee.toFixed(2)}`}
                 />
                 <Row
                   label="Provider Amt"
-                  value={`$${order.escrow.providerAmount.toFixed(2)}`}
+                  value={`$${escrow.providerAmount.toFixed(2)}`}
                 />
-                {order.escrow.lockedAt && (
+                {escrow.lockedAt && (
                   <Row
                     label="Locked"
                     value={new Date(
-                      order.escrow.lockedAt,
+                      escrow.lockedAt,
                     ).toLocaleDateString()}
                   />
                 )}
-                {order.escrow.lockTxHash && (
+                {escrow.lockTxHash && (
                   <Row
                     label="Lock TX"
-                    value={`${order.escrow.lockTxHash.slice(0, 10)}…`}
+                    value={`${escrow.lockTxHash.slice(0, 10)}…`}
                     mono
                   />
                 )}
-                {order.escrow.releaseTxHash && (
+                {escrow.releaseTxHash && (
                   <Row
                     label="Release TX"
-                    value={`${order.escrow.releaseTxHash.slice(0, 10)}…`}
+                    value={`${escrow.releaseTxHash.slice(0, 10)}…`}
                     mono
                   />
                 )}
                 <Row
                   label="Expires"
                   value={new Date(
-                    order.escrow.expiresAt,
+                    escrow.expiresAt,
                   ).toLocaleDateString()}
                 />
               </div>
               <div className="space-y-2 pt-2">
-                {order.escrow.status === "LOCKED" && (
+                {escrow.status === "LOCKED" && (
                   <Button
                     className="w-full"
                     onClick={() => setShowRelease(true)}
@@ -489,8 +454,8 @@ export default function OrderDetail() {
                     Release Funds
                   </Button>
                 )}
-                {(order.escrow.status === "LOCKED" ||
-                  order.escrow.status === "LOCKING") && (
+                {(escrow.status === "LOCKED" ||
+                  escrow.status === "LOCKING") && (
                   <Button
                     variant="danger"
                     className="w-full"

@@ -118,7 +118,7 @@ export interface Order {
   createdAt: string;
   updatedAt: string;
   items?: OrderItem[];
-  escrow?: Escrow | null;
+  escrows?: Escrow[];
   store?: Store;
 }
 
@@ -126,6 +126,7 @@ export interface Order {
 
 export type EscrowStatus =
   | 'LOCKING'
+  | 'LOCK_FAILED'
   | 'LOCKED'
   | 'RELEASING'
   | 'RELEASED'
@@ -301,6 +302,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 
 export const ESCROW_STATUS_LABELS: Record<EscrowStatus, string> = {
   LOCKING: 'Locking',
+  LOCK_FAILED: 'Lock Failed',
   LOCKED: 'Locked',
   RELEASING: 'Releasing',
   RELEASED: 'Released',
