@@ -39,7 +39,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const user = await getUserAddress(request);
   if (user) {
     const url = new URL(request.url);
-    const next = url.searchParams.get("next") || "/";
+    const next = url.searchParams.get("next") || "/dashboard";
     throw redirect(next);
   }
   return json({});
@@ -82,7 +82,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "verify") {
     const address = formData.get("address") as string;
     const signature = formData.get("signature") as string;
-    const next = (formData.get("next") as string) || "/";
+    const next = (formData.get("next") as string) || "/dashboard";
 
     // eslint-disable-next-line no-console
 
@@ -149,7 +149,7 @@ type Step = "idle" | "connecting" | "signing" | "verifying" | "error";
 
 export default function Login() {
   const [searchParams] = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  const next = searchParams.get("next") || "/dashboard";
 
   const nonceFetcher = useFetcher<{
     ok: boolean;

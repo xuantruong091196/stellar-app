@@ -66,8 +66,14 @@ export const links: LinksFunction = () => [
 export default function App() {
   const { userAddress, ENV } = useLoaderData<typeof loader>();
   const location = useLocation();
-  const isAuthRoute =
-    location.pathname === "/login" || location.pathname === "/logout";
+  const isPublicRoute =
+    location.pathname === "/" ||
+    location.pathname === "/login" ||
+    location.pathname === "/logout" ||
+    location.pathname === "/landing" ||
+    location.pathname === "/privacy" ||
+    location.pathname === "/terms" ||
+    location.pathname === "/refund-policy";
 
   return (
     <html lang="en" className="dark">
@@ -78,7 +84,7 @@ export default function App() {
         <Links />
       </head>
       <body className="bg-surface text-on-surface font-body selection:bg-primary selection:text-on-primary-container">
-        {isAuthRoute ? (
+        {isPublicRoute ? (
           <Outlet />
         ) : (
           <AppShell userAddress={userAddress}>
