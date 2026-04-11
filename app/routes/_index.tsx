@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from "react";
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
@@ -17,22 +18,55 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return json({ walletAddress });
 }
 
+const NAV_SECTIONS = ["features", "how-it-works", "pricing"] as const;
+
 export default function IndexPage() {
   const { walletAddress } = useLoaderData<typeof loader>();
+  const [activeSection, setActiveSection] = useState("");
+
+  const scrollTo = useCallback((id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setActiveSection(id);
+  }, []);
+
+  // Track active section on scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveSection(entry.target.id);
+        }
+      },
+      { rootMargin: "-40% 0px -50% 0px" },
+    );
+    for (const id of NAV_SECTIONS) {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    }
+    return () => observer.disconnect();
+  }, []);
+
+  const navLinkClass = (id: string) =>
+    `font-headline tracking-tight transition-all duration-300 cursor-pointer ${
+      activeSection === id
+        ? "text-indigo-400 font-bold border-b-2 border-indigo-500 pb-1"
+        : "text-slate-400 font-medium hover:text-white"
+    }`;
 
   return (
-    <div className="min-h-screen bg-[#121317] text-[#e3e2e8] font-body antialiased overflow-x-hidden">
+    <div className="min-h-screen bg-[#121317] text-[#e3e2e8] font-body antialiased overflow-x-hidden scroll-smooth">
       {/* Nav */}
       <nav className="fixed top-0 w-full z-50 bg-[#121317]/80 backdrop-blur-md shadow-2xl shadow-black/50">
         <div className="max-w-7xl mx-auto px-8 flex justify-between items-center h-20">
-          <Link to="/" className="flex items-center gap-2">
+          <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex items-center gap-2">
             <img src="/images/logo.png" alt="Stelo" className="h-8 w-auto" />
             <span className="text-2xl font-black text-white tracking-tighter font-headline">Stelo</span>
-          </Link>
+          </button>
           <div className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="text-indigo-400 font-bold border-b-2 border-indigo-500 pb-1 font-headline tracking-tight hover:text-white transition-all duration-300">Features</a>
-            <a href="#how-it-works" className="text-slate-400 font-medium font-headline tracking-tight hover:text-white transition-all duration-300">How it Works</a>
-            <a href="#pricing" className="text-slate-400 font-medium font-headline tracking-tight hover:text-white transition-all duration-300">Pricing</a>
+            <button onClick={() => scrollTo("features")} className={navLinkClass("features")}>Features</button>
+            <button onClick={() => scrollTo("how-it-works")} className={navLinkClass("how-it-works")}>How it Works</button>
+            <button onClick={() => scrollTo("pricing")} className={navLinkClass("pricing")}>Pricing</button>
           </div>
           <div className="flex items-center gap-3">
             {walletAddress ? (

@@ -171,13 +171,18 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
       )}
 
       {selectedIndex !== null && (
-        <button
-          onClick={onDelete}
-          className="w-full text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
-        >
-          <span className="material-symbols-outlined text-sm">delete</span>
-          Delete Selected
-        </button>
+        <div className="space-y-1">
+          <button
+            onClick={onDelete}
+            className="w-full text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
+          >
+            <span className="material-symbols-outlined text-sm">delete</span>
+            Delete Selected
+          </button>
+          <p className="text-[9px] text-on-surface-variant/40 text-center">
+            Ctrl+Z to undo
+          </p>
+        </div>
       )}
     </div>
   );

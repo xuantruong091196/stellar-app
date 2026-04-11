@@ -140,7 +140,8 @@ export function DesignEditor({
     if (!canvas) return;
     setIsEnhancing(true);
     try {
-      const dataUrl = canvas.toDataURL({ format: "png", quality: 1, multiplier: 1 });
+      // Export at 2x for better AI input quality
+      const dataUrl = canvas.toDataURL({ format: "png", quality: 1, multiplier: 2 });
       const base64 = dataUrl.split(",")[1];
 
       const res = await fetch(`${apiBaseUrl}/clipart/ai-enhance`, {
@@ -149,8 +150,13 @@ export function DesignEditor({
         body: JSON.stringify({
           imageBase64: base64,
           prompt:
-            "highly detailed, professional vector illustration, smooth lines, flat design, print-ready, cohesive art style",
-          strength: 0.5,
+            "Transform this print-on-demand t-shirt design into a polished, production-ready artwork. " +
+            "Maintain the original composition, colors, and layout. " +
+            "Enhance with crisp clean edges, smooth anti-aliased lines, vibrant saturated colors, " +
+            "professional typography rendering, and consistent visual style throughout. " +
+            "Output should be high-resolution, suitable for direct-to-garment (DTG) printing on fabric. " +
+            "Keep transparent or solid background as in original. No watermarks, no borders, no mockup frames.",
+          strength: 0.45,
           upscale: "2x",
         }),
       });
