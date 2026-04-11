@@ -121,7 +121,12 @@ export default function LandingPage() {
 
         {/* Mobile menu overlay */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-[#121317]/95 backdrop-blur-md border-t border-white/10 px-8 py-6 flex flex-col gap-5">
+          <>
+            <div
+              className="fixed inset-0 z-40 md:hidden"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <div className="md:hidden bg-[#121317]/95 backdrop-blur-md border-t border-white/10 relative z-50 px-8 py-6 flex flex-col gap-5">
             {NAV_ITEMS.map(({ label, href, id }) => (
               <a
                 key={id}
@@ -156,6 +161,7 @@ export default function LandingPage() {
               Connect Wallet
             </Link>
           </div>
+          </>
         )}
       </nav>
 

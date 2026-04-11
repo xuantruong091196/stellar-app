@@ -165,6 +165,75 @@ export function DesignEditor({
         }
         return;
       }
+      // Ctrl+A: Select all
+      if (mod && e.key === "a") {
+        e.preventDefault();
+        if (canvas) {
+          const objs = canvas.getObjects().filter((o) => {
+            const n = (o as any).name;
+            return n !== "__blank" && n !== "__printArea" && o.selectable;
+          });
+          if (objs.length > 0) {
+            import("fabric").then((fabric) => {
+              const sel = new fabric.ActiveSelection(objs, { canvas });
+              canvas.setActiveObject(sel);
+              canvas.requestRenderAll();
+            });
+          }
+        }
+        return;
+      }
+
+      // Ctrl+] / Ctrl+[: Bring forward / send backward
+      if (mod && e.key === "]" && !e.shiftKey) {
+        e.preventDefault();
+        if (canvas) {
+          const obj = canvas.getActiveObject();
+          if (obj) { canvas.bringObjectForward(obj); canvas.requestRenderAll(); }
+        }
+        return;
+      }
+      if (mod && e.key === "[" && !e.shiftKey) {
+        e.preventDefault();
+        if (canvas) {
+          const obj = canvas.getActiveObject();
+          if (obj) { canvas.sendObjectBackwards(obj); canvas.requestRenderAll(); }
+        }
+        return;
+      }
+
+      // Ctrl+Shift+] / Ctrl+Shift+[: Bring to front / send to back
+      if (mod && e.key === "]" && e.shiftKey) {
+        e.preventDefault();
+        if (canvas) {
+          const obj = canvas.getActiveObject();
+          if (obj) { canvas.bringObjectToFront(obj); canvas.requestRenderAll(); }
+        }
+        return;
+      }
+      if (mod && e.key === "[" && e.shiftKey) {
+        e.preventDefault();
+        if (canvas) {
+          const obj = canvas.getActiveObject();
+          if (obj) { canvas.sendObjectToBack(obj); canvas.requestRenderAll(); }
+        }
+        return;
+      }
+
+      // Ctrl+L: Lock/unlock
+      if (mod && e.key === "l") {
+        e.preventDefault();
+        if (canvas) {
+          const obj = canvas.getActiveObject();
+          if (obj && (obj as any).name !== "__blank") {
+            const locked = obj.selectable;
+            obj.set({ selectable: !locked, evented: !locked });
+            canvas.requestRenderAll();
+          }
+        }
+        return;
+      }
+
       if ((e.key === "Delete" || e.key === "Backspace") && canvas) {
         const active = canvas.getActiveObject();
         if (active && !(active as any).isEditing) {

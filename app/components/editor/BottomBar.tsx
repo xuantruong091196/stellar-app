@@ -22,12 +22,6 @@ export function BottomBar({
       setZoom(clamped);
       if (!canvas) return;
       canvas.setZoom(clamped);
-      const wrapper = canvas.getElement().parentElement;
-      if (wrapper) {
-        const baseW = wrapper.clientWidth;
-        const baseH = wrapper.clientHeight;
-        canvas.setDimensions({ width: baseW * clamped, height: baseH * clamped });
-      }
       canvas.requestRenderAll();
     },
     [canvas],
