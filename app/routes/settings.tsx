@@ -107,6 +107,52 @@ export default function Settings() {
           </div>
         </section>
 
+        {/* Shopify Integration */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div>
+            <h2 className="text-lg font-bold font-headline">Shopify Store</h2>
+            <p className="text-sm text-on-surface-variant mt-2">
+              Connect your Shopify store to publish products and receive orders automatically.
+            </p>
+          </div>
+          <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-[#96BF48]/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[#96BF48] text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>shopping_cart</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold">Connect Shopify</h3>
+                <p className="text-xs text-on-surface-variant">Install the Stelo app on your Shopify store to enable product publishing and order sync.</p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                placeholder="your-store.myshopify.com"
+                id="shopify-domain"
+                className="ghost-input font-mono text-sm flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const input = document.getElementById("shopify-domain") as HTMLInputElement;
+                  const shop = input?.value?.trim();
+                  if (!shop) return;
+                  const domain = shop.includes(".myshopify.com") ? shop : `${shop}.myshopify.com`;
+                  const apiBase = typeof window !== "undefined" ? window.ENV?.PUBLIC_API_URL : "";
+                  window.location.href = `${apiBase}/auth/install?shop=${encodeURIComponent(domain)}`;
+                }}
+                className="stellar-gradient px-6 py-2.5 rounded-full text-white font-bold text-sm whitespace-nowrap hover:scale-105 active:scale-95 transition-transform"
+              >
+                Connect Store
+              </button>
+            </div>
+            <p className="text-[10px] text-on-surface-variant/60">
+              You will be redirected to Shopify to authorize the Stelo app. After approval, your store will be connected automatically.
+            </p>
+          </div>
+        </section>
+
         {/* Store */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div>
