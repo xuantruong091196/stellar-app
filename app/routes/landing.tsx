@@ -1,5 +1,6 @@
 import type { MetaFunction } from "@remix-run/node";
 import { Link } from "@remix-run/react";
+import { useState, useEffect, useCallback } from "react";
 import { pageMeta } from "~/lib/seo";
 
 export const meta: MetaFunction = () =>
@@ -10,7 +11,45 @@ export const meta: MetaFunction = () =>
     path: "/landing",
   });
 
+const NAV_ITEMS = [
+  { label: "Features", href: "#features", id: "features" },
+  { label: "How it Works", href: "#how-it-works", id: "how-it-works" },
+  { label: "Pricing", href: "#pricing", id: "pricing" },
+];
+
 export default function LandingPage() {
+  const [activeSection, setActiveSection] = useState<string>("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleNavClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault();
+    const id = href.replace("#", "");
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    }
+  }, []);
+
+  useEffect(() => {
+    const sectionIds = ["features", "how-it-works", "pricing"];
+    const observers: IntersectionObserver[] = [];
+
+    sectionIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) setActiveSection(id);
+        },
+        { threshold: 0.5 }
+      );
+      observer.observe(el);
+      observers.push(observer);
+    });
+
+    return () => observers.forEach((o) => o.disconnect());
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#121317] text-[#e3e2e8] font-body antialiased overflow-x-hidden">
       {/* Nav */}
@@ -22,20 +61,56 @@ export default function LandingPage() {
               Stelo
             </span>
           </Link>
+
+          {/* Desktop nav */}
           <div className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="text-indigo-400 font-bold border-b-2 border-indigo-500 pb-1 font-headline tracking-tight hover:text-white transition-all duration-300">
-              Features
-            </a>
-            <a href="#how-it-works" className="text-slate-400 font-medium font-headline tracking-tight hover:text-white transition-all duration-300">
-              How it Works
-            </a>
-            <a href="#pricing" className="text-slate-400 font-medium font-headline tracking-tight hover:text-white transition-all duration-300">
-              Pricing
-            </a>
-            <a href="https://docs.stelo.life" className="text-slate-400 font-medium font-headline tracking-tight hover:text-white transition-all duration-300">
+            {NAV_ITEMS.map(({ label, href, id }) => (
+              <a
+                key={id}
+                href={href}
+                onClick={(e) => handleNavClick(e, href)}
+                className={`font-headline tracking-tight transition-all duration-300 pb-1 border-b-2 ${
+                  activeSection === id
+                    ? "text-white border-indigo-500 font-bold"
+                    : "text-slate-400 hover:text-white border-transparent"
+                }`}
+              >
+                {label}
+              </a>
+            ))}
+            <a
+              href="https://docs.stelo.life"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 font-medium font-headline tracking-tight hover:text-white transition-all duration-300 pb-1 border-b-2 border-transparent"
+            >
               Docs
             </a>
           </div>
+
+          {/* Hamburger button (mobile) */}
+          <button
+            className="md:hidden flex flex-col justify-center items-center w-10 h-10 gap-1.5 mr-3"
+            aria-label="Toggle menu"
+            onClick={() => setMobileMenuOpen((o) => !o)}
+          >
+            <span
+              className={`block h-0.5 w-6 bg-white transition-transform duration-300 ${
+                mobileMenuOpen ? "rotate-45 translate-y-2" : ""
+              }`}
+            />
+            <span
+              className={`block h-0.5 w-6 bg-white transition-opacity duration-300 ${
+                mobileMenuOpen ? "opacity-0" : ""
+              }`}
+            />
+            <span
+              className={`block h-0.5 w-6 bg-white transition-transform duration-300 ${
+                mobileMenuOpen ? "-rotate-45 -translate-y-2" : ""
+              }`}
+            />
+          </button>
+
           <Link
             to="/login"
             className="stellar-gradient px-6 py-2.5 rounded-full text-white font-bold text-sm tracking-wide shadow-lg shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-transform"
@@ -43,6 +118,45 @@ export default function LandingPage() {
             Connect Wallet
           </Link>
         </div>
+
+        {/* Mobile menu overlay */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-[#121317]/95 backdrop-blur-md border-t border-white/10 px-8 py-6 flex flex-col gap-5">
+            {NAV_ITEMS.map(({ label, href, id }) => (
+              <a
+                key={id}
+                href={href}
+                onClick={(e) => {
+                  handleNavClick(e, href);
+                  setMobileMenuOpen(false);
+                }}
+                className={`font-headline tracking-tight transition-all duration-300 pb-1 border-b-2 w-fit ${
+                  activeSection === id
+                    ? "text-white border-indigo-500 font-bold"
+                    : "text-slate-400 hover:text-white border-transparent"
+                }`}
+              >
+                {label}
+              </a>
+            ))}
+            <a
+              href="https://docs.stelo.life"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-slate-400 font-medium font-headline tracking-tight hover:text-white transition-all duration-300 pb-1 border-b-2 border-transparent w-fit"
+            >
+              Docs
+            </a>
+            <Link
+              to="/login"
+              onClick={() => setMobileMenuOpen(false)}
+              className="stellar-gradient px-6 py-2.5 rounded-full text-white font-bold text-sm tracking-wide shadow-lg shadow-indigo-500/20 text-center mt-2"
+            >
+              Connect Wallet
+            </Link>
+          </div>
+        )}
       </nav>
 
       <main className="pt-20">
@@ -222,11 +336,10 @@ export default function LandingPage() {
               &copy; 2026 Stelo. Powered by Stellar &amp; Shopify.
             </p>
           </div>
-          <div className="flex gap-8">
-            <a href="#" className="text-slate-500 font-headline text-sm uppercase tracking-widest hover:text-cyan-400 transition-colors duration-200">Privacy Policy</a>
-            <a href="#" className="text-slate-500 font-headline text-sm uppercase tracking-widest hover:text-cyan-400 transition-colors duration-200">Terms of Service</a>
-            <a href="#" className="text-slate-500 font-headline text-sm uppercase tracking-widest hover:text-cyan-400 transition-colors duration-200">Developer API</a>
-            <a href="#" className="text-slate-500 font-headline text-sm uppercase tracking-widest hover:text-cyan-400 transition-colors duration-200">Status</a>
+          <div className="flex flex-wrap gap-8">
+            <Link to="/privacy" className="text-slate-500 font-headline text-sm uppercase tracking-widest hover:text-cyan-400 transition-colors duration-200">Privacy Policy</Link>
+            <Link to="/terms" className="text-slate-500 font-headline text-sm uppercase tracking-widest hover:text-cyan-400 transition-colors duration-200">Terms of Service</Link>
+            <a href="https://docs.stelo.life" target="_blank" rel="noopener noreferrer" className="text-slate-500 font-headline text-sm uppercase tracking-widest hover:text-cyan-400 transition-colors duration-200">Developer API</a>
           </div>
         </div>
       </footer>
