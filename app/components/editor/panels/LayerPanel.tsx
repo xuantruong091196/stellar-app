@@ -102,7 +102,7 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
   const selectLayer = useCallback(
     (index: number, e?: React.MouseEvent) => {
       if (!canvas) return;
-      const obj = canvas.item(index);
+      const obj = canvas.getObjects()[index];
       if (!obj || !obj.selectable) return;
 
       if (e?.ctrlKey || e?.metaKey) {
@@ -131,7 +131,7 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
   const toggleVisibility = useCallback(
     (index: number) => {
       if (!canvas) return;
-      const obj = canvas.item(index);
+      const obj = canvas.getObjects()[index];
       if (obj) {
         obj.set("visible", !obj.visible);
         canvas.renderAll();
@@ -146,7 +146,7 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
   const toggleLock = useCallback(
     (index: number) => {
       if (!canvas) return;
-      const obj = canvas.item(index);
+      const obj = canvas.getObjects()[index];
       if (obj && (obj as any).name !== "__blank") {
         const locked = obj.selectable;
         obj.set({ selectable: !locked, evented: !locked });
@@ -162,7 +162,7 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
   const setOpacity = useCallback(
     (index: number, value: number) => {
       if (!canvas) return;
-      const obj = canvas.item(index);
+      const obj = canvas.getObjects()[index];
       if (obj) {
         obj.set("opacity", value / 100);
         canvas.renderAll();
@@ -177,7 +177,7 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
   const setBlendMode = useCallback(
     (index: number, mode: string) => {
       if (!canvas) return;
-      const obj = canvas.item(index);
+      const obj = canvas.getObjects()[index];
       if (obj) {
         (obj as any).globalCompositeOperation = mode;
         canvas.renderAll();
@@ -193,7 +193,7 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
   const renameLayer = useCallback(
     (index: number, newName: string) => {
       if (!canvas) return;
-      const obj = canvas.item(index);
+      const obj = canvas.getObjects()[index];
       if (obj) {
         (obj as any).name = newName;
         setLayers((prev) =>
@@ -208,7 +208,7 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
   const duplicateLayer = useCallback(
     (index: number) => {
       if (!canvas) return;
-      const obj = canvas.item(index);
+      const obj = canvas.getObjects()[index];
       if (!obj) return;
       obj.clone().then((cloned: any) => {
         cloned.set({ left: (cloned.left || 0) + 20, top: (cloned.top || 0) + 20 });
@@ -225,7 +225,7 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
   const deleteLayer = useCallback(
     (index: number) => {
       if (!canvas) return;
-      const obj = canvas.item(index);
+      const obj = canvas.getObjects()[index];
       if (obj && (obj as any).name !== "__blank") {
         canvas.remove(obj);
         canvas.discardActiveObject();
@@ -276,7 +276,7 @@ export function LayerPanel({ canvas, revision, onDelete }: LayerPanelProps) {
         setDropTarget(null);
         return;
       }
-      const obj = canvas.item(dragIndex);
+      const obj = canvas.getObjects()[dragIndex];
       if (!obj) return;
 
       canvas.moveObjectTo(obj, targetIndex);
