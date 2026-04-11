@@ -70,12 +70,6 @@ export default function LandingPage() {
                 >
                   Connect Wallet
                 </Link>
-                <a
-                  href="#how-it-works"
-                  className="bg-surface-container-high px-8 py-4 rounded-full text-primary font-bold text-lg hover:bg-surface-bright transition-all active:scale-95 text-center"
-                >
-                  View Demo
-                </a>
               </div>
             </div>
             <div className="relative group">

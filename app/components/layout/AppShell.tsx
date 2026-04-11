@@ -10,7 +10,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-	{ label: "Dashboard", icon: "dashboard", href: "/", match: (p) => p === "/" },
+	{ label: "Dashboard", icon: "dashboard", href: "/dashboard", match: (p) => p === "/dashboard" },
 	{
 		label: "Products",
 		icon: "inventory_2",
