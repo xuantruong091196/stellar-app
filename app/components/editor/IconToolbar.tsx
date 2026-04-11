@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback } from "react";
 
 export type PanelTab = "elements" | "text" | "upload" | "ai" | "layers";
