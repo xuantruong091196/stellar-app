@@ -12,6 +12,7 @@ import { LayerPanel } from "./panels/LayerPanel";
 import { TextPanel } from "./panels/TextPanel";
 import { ShapesPanel } from "./panels/ShapesPanel";
 import { UploadPanel } from "./panels/UploadPanel";
+import { AiToolsPanel } from "./panels/AiToolsPanel";
 
 interface PrintAreaDef {
   name: string;
@@ -271,10 +272,12 @@ export function DesignEditor({
           {activeTab === "text" && <TextPanel onAddText={addTextToCanvas} />}
           {activeTab === "upload" && <UploadPanel onAddImage={addImageToCanvas} />}
           {activeTab === "ai" && (
-            <div className="text-center py-8">
-              <span className="material-symbols-outlined text-3xl text-on-surface-variant/40 mb-2 block">auto_awesome</span>
-              <p className="text-xs text-on-surface-variant">AI Tools coming in Phase 4</p>
-            </div>
+            <AiToolsPanel
+              canvas={canvas}
+              apiBaseUrl={apiBaseUrl}
+              displayPrintArea={displayPrintArea}
+              onSaveHistory={saveBaseState}
+            />
           )}
           {activeTab === "layers" && (
             <LayerPanel canvas={canvas} revision={revision} onDelete={deleteSelected} />
