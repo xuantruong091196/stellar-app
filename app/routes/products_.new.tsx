@@ -148,6 +148,9 @@ export default function CreateProduct() {
   const [pricingLoading, setPricingLoading] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [loadingDesigns, setLoadingDesigns] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [catalogPage, setCatalogPage] = useState(1);
+  const CATALOG_PAGE_SIZE = 9;
   const [loadError, setLoadError] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const [editorLayers, setEditorLayers] = useState<object | null>(null);
@@ -351,70 +354,145 @@ export default function CreateProduct() {
       )}
 
       {/* ─── Step 1: Choose Product ─── */}
-      {step === 0 && (
-        <section className="bg-surface-container-low rounded-2xl p-8 space-y-6">
-          <h2 className="text-xl font-bold font-headline">
-            Choose a Product from the Catalog
-          </h2>
-          {loadingCatalog ? (
-            <p className="text-on-surface-variant text-sm">Loading catalog...</p>
-          ) : providerProducts.length === 0 ? (
-            <p className="text-on-surface-variant text-sm">
-              No active products found in the catalog.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-              {providerProducts.map((pp) => {
-                const img = Object.values(pp.blankImages)[0];
+      {step === 0 && (() => {
+        const categories = ["all", ...Array.from(new Set(providerProducts.map((p) => p.productType))).sort()];
+        const filtered = categoryFilter === "all"
+          ? providerProducts
+          : providerProducts.filter((p) => p.productType === categoryFilter);
+        const totalPages = Math.ceil(filtered.length / CATALOG_PAGE_SIZE);
+        const paginated = filtered.slice(
+          (catalogPage - 1) * CATALOG_PAGE_SIZE,
+          catalogPage * CATALOG_PAGE_SIZE,
+        );
+
+        return (
+          <section className="bg-surface-container-low rounded-2xl p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <h2 className="text-xl font-bold font-headline">
+                Choose a Product from the Catalog
+              </h2>
+              <span className="text-xs text-on-surface-variant">
+                {filtered.length} product{filtered.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {/* Category filter tabs */}
+            <div className="flex flex-wrap gap-2">
+              {categories.map((cat) => {
+                const count = cat === "all"
+                  ? providerProducts.length
+                  : providerProducts.filter((p) => p.productType === cat).length;
                 return (
                   <button
-                    key={pp.id}
-                    onClick={() => {
-                      setSelectedProduct(pp);
-                      setStep(1);
-                    }}
-                    className="bg-surface-container p-4 rounded-2xl text-left hover:bg-surface-container-high transition-colors group"
+                    key={cat}
+                    onClick={() => { setCategoryFilter(cat); setCatalogPage(1); }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide transition-colors ${
+                      categoryFilter === cat
+                        ? "bg-[#6366F1] text-white"
+                        : "bg-surface-container-high text-on-surface-variant hover:bg-surface-bright"
+                    }`}
                   >
-                    <div className="w-full h-40 rounded-xl bg-surface-container-highest mb-4 flex items-center justify-center overflow-hidden">
-                      {img ? (
-                        <img
-                          src={img}
-                          alt={pp.name}
-                          className="w-full h-full object-contain p-4"
-                        />
-                      ) : (
-                        <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">
-                          checkroom
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="font-bold mb-1 group-hover:text-primary transition-colors">
-                      {pp.name}
-                    </h3>
-                    {pp.brand && (
-                      <p className="text-xs text-on-surface-variant">
-                        {pp.brand}
-                      </p>
-                    )}
-                    <div className="mt-3 flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-full bg-[#6366F1]/10 text-[#6366F1] text-[10px] font-bold uppercase">
-                        {pp.productType}
-                      </span>
-                      <span className="font-mono font-bold text-sm">
-                        ${pp.baseCost.toFixed(2)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-on-surface-variant mt-2">
-                      {pp.productionDays} day
-                      {pp.productionDays !== 1 ? "s" : ""} production
-                    </p>
+                    {cat === "all" ? "All" : cat.replace("-", " ")} ({count})
                   </button>
                 );
               })}
             </div>
-          )}
-        </section>
-      )}
+
+            {loadingCatalog ? (
+              <p className="text-on-surface-variant text-sm">Loading catalog...</p>
+            ) : paginated.length === 0 ? (
+              <p className="text-on-surface-variant text-sm">
+                No products found{categoryFilter !== "all" ? ` in "${categoryFilter}"` : ""}.
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                  {paginated.map((pp) => {
+                    const img = Object.values(pp.blankImages)[0];
+                    return (
+                      <button
+                        key={pp.id}
+                        onClick={() => {
+                          setSelectedProduct(pp);
+                          setStep(1);
+                        }}
+                        className="bg-surface-container p-4 rounded-2xl text-left hover:bg-surface-container-high transition-colors group"
+                      >
+                        <div className="w-full h-40 rounded-xl bg-surface-container-highest mb-4 flex items-center justify-center overflow-hidden">
+                          {img ? (
+                            <img
+                              src={img}
+                              alt={pp.name}
+                              className="w-full h-full object-contain p-4"
+                            />
+                          ) : (
+                            <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">
+                              checkroom
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="font-bold mb-1 group-hover:text-primary transition-colors">
+                          {pp.name}
+                        </h3>
+                        {pp.brand && (
+                          <p className="text-xs text-on-surface-variant">
+                            {pp.brand}
+                          </p>
+                        )}
+                        <div className="mt-3 flex items-center justify-between">
+                          <span className="px-2 py-0.5 rounded-full bg-[#6366F1]/10 text-[#6366F1] text-[10px] font-bold uppercase">
+                            {pp.productType}
+                          </span>
+                          <span className="font-mono font-bold text-sm">
+                            ${pp.baseCost.toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-on-surface-variant mt-2">
+                          {pp.productionDays} day
+                          {pp.productionDays !== 1 ? "s" : ""} production
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 pt-4">
+                    <button
+                      onClick={() => setCatalogPage((p) => Math.max(1, p - 1))}
+                      disabled={catalogPage === 1}
+                      className="px-3 py-1.5 rounded-lg text-sm font-bold bg-surface-container-high text-on-surface-variant hover:bg-surface-bright disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCatalogPage(page)}
+                        className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors ${
+                          catalogPage === page
+                            ? "bg-[#6366F1] text-white"
+                            : "bg-surface-container-high text-on-surface-variant hover:bg-surface-bright"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setCatalogPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={catalogPage === totalPages}
+                      className="px-3 py-1.5 rounded-lg text-sm font-bold bg-surface-container-high text-on-surface-variant hover:bg-surface-bright disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        );
+      })()}
 
       {/* ─── Step 2: Choose Design ─── */}
       {step === 1 && (
