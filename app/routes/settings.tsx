@@ -140,7 +140,7 @@ export default function Settings() {
                   if (!shop) return;
                   const domain = shop.includes(".myshopify.com") ? shop : `${shop}.myshopify.com`;
                   const apiBase = typeof window !== "undefined" ? window.ENV?.PUBLIC_API_URL : "";
-                  window.location.href = `${apiBase}/auth/install?shop=${encodeURIComponent(domain)}`;
+                  window.location.href = `${apiBase}/auth/shopify/install?shop=${encodeURIComponent(domain)}`;
                 }}
                 className="stellar-gradient px-6 py-2.5 rounded-full text-white font-bold text-sm whitespace-nowrap hover:scale-105 active:scale-95 transition-transform"
               >
