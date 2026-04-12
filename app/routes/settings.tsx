@@ -1,17 +1,40 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type {
   MetaFunction,
   ActionFunctionArgs,
   LoaderFunctionArgs,
 } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useFetcher } from "@remix-run/react";
+import { useFetcher, useLoaderData, Link } from "@remix-run/react";
+import { apiGet, apiPatch, apiPost, deriveStoreId } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import { WalletConnect } from "~/components/WalletConnect";
 import { PageHeader } from "~/components/ui/PageHeader";
 import { Button } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/StatusPill";
 import { pageMeta } from "~/lib/seo";
+
+interface StoreSettings {
+  id: string;
+  storeId: string;
+  storeName: string | null;
+  locale: string;
+  webhookUrl: string | null;
+  webhookSecret: string | null;
+  webhookEnabled: boolean;
+  webhookDisabledAt: string | null;
+  webhookDisabledReason: string | null;
+  defaultMarkup: number;
+  notifyOrders: boolean;
+  notifyEscrow: boolean;
+  notifyShipping: boolean;
+  notifyDisputes: boolean;
+  notifyProducts: boolean;
+  notifySystem: boolean;
+  notificationEmail: string | null;
+  emailEnabled: boolean;
+  inAppEnabled: boolean;
+}
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -23,36 +46,88 @@ export const meta: MetaFunction = () =>
   });
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  await requireUser(request);
-  return json({});
+  const walletAddress = await requireUser(request);
+  const storeId = deriveStoreId(walletAddress);
+  const res = await apiGet<StoreSettings>(`/settings/store/${storeId}`, walletAddress);
+  return json({
+    walletAddress,
+    storeId,
+    settings: res.data,
+    error: res.error,
+  });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  await requireUser(request);
+  const walletAddress = await requireUser(request);
+  const storeId = deriveStoreId(walletAddress);
   const formData = await request.formData();
-  const settings = {
-    storeName: formData.get("storeName") as string,
-    webhookUrl: formData.get("webhookUrl") as string,
-    walletAddress: formData.get("walletAddress") as string | null,
-    defaultMarkup: formData.get("defaultMarkup") as string,
-    notifyOrders: formData.get("notifyOrders") === "on",
-    notifyEscrow: formData.get("notifyEscrow") === "on",
-    notifyShipping: formData.get("notifyShipping") === "on",
-    notifyDisputes: formData.get("notifyDisputes") === "on",
-  };
-  return json({ success: true, error: null });
+  const intent = formData.get("intent") as string;
+
+  if (intent === "save") {
+    const updates = {
+      storeName: formData.get("storeName") as string,
+      locale: formData.get("locale") as string,
+      webhookUrl: formData.get("webhookUrl") as string || null,
+      webhookEnabled: formData.get("webhookEnabled") === "on",
+      defaultMarkup: parseFloat(formData.get("defaultMarkup") as string),
+      notifyOrders: formData.get("notifyOrders") === "on",
+      notifyEscrow: formData.get("notifyEscrow") === "on",
+      notifyShipping: formData.get("notifyShipping") === "on",
+      notifyDisputes: formData.get("notifyDisputes") === "on",
+      notifyProducts: formData.get("notifyProducts") === "on",
+      notifySystem: formData.get("notifySystem") === "on",
+      notificationEmail: (formData.get("notificationEmail") as string) || null,
+      emailEnabled: formData.get("emailEnabled") === "on",
+      inAppEnabled: formData.get("inAppEnabled") === "on",
+    };
+    const res = await apiPatch<StoreSettings>(
+      `/settings/store/${storeId}`,
+      updates,
+      walletAddress,
+    );
+    return res.error
+      ? json({ error: res.error, success: false, secret: null })
+      : json({ success: true, error: null, secret: null });
+  }
+
+  if (intent === "rotate-secret") {
+    const res = await apiPost<{ secret: string }>(
+      `/settings/store/${storeId}/webhook/secret`,
+      {},
+      walletAddress,
+    );
+    return res.error
+      ? json({ error: res.error, success: false, secret: null })
+      : json({ success: true, error: null, secret: res.data?.secret || null });
+  }
+
+  if (intent === "enable-webhook") {
+    const res = await apiPost(
+      `/settings/store/${storeId}/webhook/enable`,
+      {},
+      walletAddress,
+    );
+    return res.error
+      ? json({ error: res.error, success: false, secret: null })
+      : json({ success: true, error: null, secret: null });
+  }
+
+  return json({ error: "Unknown intent", success: false, secret: null }, { status: 400 });
 }
 
 export default function Settings() {
+  const { settings: initialSettings } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
-  const [storeName, setStoreName] = useState("My Stellar Store");
-  const [webhookUrl, setWebhookUrl] = useState("");
+
+  const [settings, setSettings] = useState<StoreSettings | null>(initialSettings);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [defaultMarkup, setDefaultMarkup] = useState("30");
-  const [notifyOrders, setNotifyOrders] = useState(true);
-  const [notifyEscrow, setNotifyEscrow] = useState(true);
-  const [notifyShipping, setNotifyShipping] = useState(true);
-  const [notifyDisputes, setNotifyDisputes] = useState(true);
+  const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (fetcher.data?.secret) {
+      setRevealedSecret(fetcher.data.secret);
+    }
+  }, [fetcher.data]);
 
   const isSaving = fetcher.state !== "idle";
   const saved = fetcher.data?.success === true && fetcher.state === "idle";
@@ -61,12 +136,24 @@ export default function Settings() {
     setWalletAddress(address);
   }, []);
 
+  const updateField = <K extends keyof StoreSettings>(key: K, value: StoreSettings[K]) => {
+    setSettings((prev) => (prev ? { ...prev, [key]: value } : null));
+  };
+
+  if (!settings) {
+    return (
+      <>
+        <PageHeader title="Settings" subtitle="Configure your Stelo store" />
+        <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-6 py-4 rounded-2xl">
+          <p>Failed to load settings.</p>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
-      <PageHeader
-        title="Settings"
-        subtitle="Configure your Stelo store"
-      />
+      <PageHeader title="Settings" subtitle="Configure your Stelo store" />
 
       {saved && (
         <div className="bg-green-400/10 border border-green-400/20 text-green-200 px-6 py-4 rounded-2xl flex items-center gap-2">
@@ -74,35 +161,27 @@ export default function Settings() {
           <p className="text-sm font-bold">Settings saved successfully</p>
         </div>
       )}
-      {fetcher.data && !fetcher.data.success && (
+      {fetcher.data && fetcher.data.error && (
         <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-6 py-4 rounded-2xl">
-          <p className="text-sm font-bold">Failed to save settings</p>
-          <p className="text-xs opacity-80">
-            {fetcher.data.error || "Unknown error"}
-          </p>
+          <p className="text-sm font-bold">Error: {fetcher.data.error}</p>
         </div>
       )}
 
       <fetcher.Form method="post" className="space-y-8">
+        <input type="hidden" name="intent" value="save" />
+
         {/* Wallet Section */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div>
             <h2 className="text-lg font-bold font-headline">Stellar Wallet</h2>
             <p className="text-sm text-on-surface-variant mt-2">
-              Connect your Freighter wallet to manage escrow payments on the
-              Stellar blockchain.
+              Connect your Freighter wallet to manage escrow payments.
             </p>
           </div>
           <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-4">
             <WalletConnect onAddressChange={handleWalletAddressChange} />
-            <input
-              type="hidden"
-              name="walletAddress"
-              value={walletAddress || ""}
-            />
             <p className="text-xs text-on-surface-variant pt-2">
-              Your wallet signs escrow transactions. Funds are held in USDC on
-              the Stellar network until fulfillment is confirmed.
+              Your wallet signs escrow transactions. Funds are held in USDC on the Stellar network until fulfillment is confirmed.
             </p>
           </div>
         </section>
@@ -116,15 +195,6 @@ export default function Settings() {
             </p>
           </div>
           <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[#96BF48]/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[#96BF48] text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>shopping_cart</span>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold">Connect Shopify</h3>
-                <p className="text-xs text-on-surface-variant">Install the Stelo app on your Shopify store to enable product publishing and order sync.</p>
-              </div>
-            </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
@@ -148,17 +218,17 @@ export default function Settings() {
               </button>
             </div>
             <p className="text-[10px] text-on-surface-variant/60">
-              You will be redirected to Shopify to authorize the Stelo app. After approval, your store will be connected automatically.
+              You will be redirected to Shopify to authorize the Stelo app.
             </p>
           </div>
         </section>
 
-        {/* Store */}
+        {/* Store Settings */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div>
             <h2 className="text-lg font-bold font-headline">Store Settings</h2>
             <p className="text-sm text-on-surface-variant mt-2">
-              Configure your store name and integration endpoints.
+              Store name and locale preference.
             </p>
           </div>
           <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-6">
@@ -169,25 +239,42 @@ export default function Settings() {
               <input
                 type="text"
                 name="storeName"
-                value={storeName}
-                onChange={(e) => setStoreName(e.target.value)}
+                value={settings.storeName || ""}
+                onChange={(e) => updateField("storeName", e.target.value)}
                 className="ghost-input font-headline text-lg"
               />
             </div>
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
-                Webhook URL
+                Language / Ngôn ngữ
+              </label>
+              <select
+                name="locale"
+                value={settings.locale}
+                onChange={(e) => updateField("locale", e.target.value)}
+                className="bg-surface-container text-on-surface rounded-xl px-4 py-3 border-0 focus:ring-2 focus:ring-primary"
+              >
+                <option value="en">English</option>
+                <option value="vi">Tiếng Việt</option>
+              </select>
+              <p className="text-xs text-on-surface-variant mt-2">
+                Used for email notifications.
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
+                Notification Email
               </label>
               <input
-                type="url"
-                name="webhookUrl"
-                value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
-                placeholder="https://your-server.com/webhook"
+                type="email"
+                name="notificationEmail"
+                value={settings.notificationEmail || ""}
+                onChange={(e) => updateField("notificationEmail", e.target.value)}
+                placeholder="merchant@example.com"
                 className="ghost-input font-mono text-sm"
               />
               <p className="text-xs text-on-surface-variant mt-2">
-                Optional: receive real-time events for orders & escrow.
+                Where to send notification emails. Leave empty to use the email from your Shopify connection.
               </p>
             </div>
           </div>
@@ -198,8 +285,7 @@ export default function Settings() {
           <div>
             <h2 className="text-lg font-bold font-headline">Pricing</h2>
             <p className="text-sm text-on-surface-variant mt-2">
-              Configure pricing defaults. The platform fee is set by
-              Stelo.
+              Default markup applied when creating new products.
             </p>
           </div>
           <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-6">
@@ -207,77 +293,187 @@ export default function Settings() {
               <span className="text-sm">Platform Fee Rate</span>
               <Pill tone="indigo">5%</Pill>
             </div>
-            <p className="text-xs text-on-surface-variant">
-              The platform fee is automatically deducted from every
-              transaction and is not configurable.
-            </p>
             <div className="h-[1px] bg-outline-variant/20" />
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
                 Default Markup %
               </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  name="defaultMarkup"
-                  value={defaultMarkup}
-                  onChange={(e) => setDefaultMarkup(e.target.value)}
-                  className="ghost-input font-mono text-lg pr-10"
-                />
-                <span className="absolute right-0 top-3 text-on-surface-variant font-mono">
-                  %
-                </span>
-              </div>
+              <input
+                type="number"
+                name="defaultMarkup"
+                value={settings.defaultMarkup}
+                onChange={(e) => updateField("defaultMarkup", parseFloat(e.target.value))}
+                className="ghost-input font-mono text-lg"
+              />
               <p className="text-xs text-on-surface-variant mt-2">
-                Suggested markup when creating new products. Override per
-                product.
+                Suggested markup when creating new products.
               </p>
-            </div>
-            <div className="h-[1px] bg-outline-variant/20" />
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Currency</span>
-              <Pill tone="cyan">USDC / Stellar</Pill>
             </div>
           </div>
         </section>
 
-        {/* Notifications */}
+        {/* Notification Channels */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div>
-            <h2 className="text-lg font-bold font-headline">Notifications</h2>
+            <h2 className="text-lg font-bold font-headline">Notification Channels</h2>
             <p className="text-sm text-on-surface-variant mt-2">
-              Choose which events you want to be notified about.
+              How do you want to receive notifications?
+            </p>
+          </div>
+          <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-4">
+            <Toggle
+              name="inAppEnabled"
+              label="In-app notifications"
+              description="Show in the bell icon and notifications page"
+              checked={settings.inAppEnabled}
+              onChange={(v) => updateField("inAppEnabled", v)}
+            />
+            <Toggle
+              name="emailEnabled"
+              label="Email"
+              description="Send to your notification email address"
+              checked={settings.emailEnabled}
+              onChange={(v) => updateField("emailEnabled", v)}
+            />
+            <Toggle
+              name="webhookEnabled"
+              label="Webhook outbound"
+              description="POST events to your custom URL (HMAC signed)"
+              checked={settings.webhookEnabled}
+              onChange={(v) => updateField("webhookEnabled", v)}
+            />
+          </div>
+        </section>
+
+        {/* Notification Categories */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div>
+            <h2 className="text-lg font-bold font-headline">Notification Categories</h2>
+            <p className="text-sm text-on-surface-variant mt-2">
+              Choose which event categories to receive.
             </p>
           </div>
           <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-4">
             <Toggle
               name="notifyOrders"
-              label="New orders"
-              description="Get notified when a new order is placed"
-              checked={notifyOrders}
-              onChange={setNotifyOrders}
+              label="Orders"
+              description="New, cancelled, refunded orders"
+              checked={settings.notifyOrders}
+              onChange={(v) => updateField("notifyOrders", v)}
             />
             <Toggle
               name="notifyEscrow"
-              label="Escrow updates"
-              description="Status changes (locked, released, disputed)"
-              checked={notifyEscrow}
-              onChange={setNotifyEscrow}
+              label="Escrow"
+              description="Lock, release, refund, expiry events"
+              checked={settings.notifyEscrow}
+              onChange={(v) => updateField("notifyEscrow", v)}
             />
             <Toggle
               name="notifyShipping"
-              label="Shipping updates"
-              description="Tracking information updates"
-              checked={notifyShipping}
-              onChange={setNotifyShipping}
+              label="Shipping"
+              description="Tracking updates and delivery confirmations"
+              checked={settings.notifyShipping}
+              onChange={(v) => updateField("notifyShipping", v)}
             />
             <Toggle
               name="notifyDisputes"
               label="Disputes"
-              description="When a dispute is opened or resolved"
-              checked={notifyDisputes}
-              onChange={setNotifyDisputes}
+              description="Dispute opened or resolved"
+              checked={settings.notifyDisputes}
+              onChange={(v) => updateField("notifyDisputes", v)}
             />
+            <Toggle
+              name="notifyProducts"
+              label="Products"
+              description="Product publish success or failure"
+              checked={settings.notifyProducts}
+              onChange={(v) => updateField("notifyProducts", v)}
+            />
+            <Toggle
+              name="notifySystem"
+              label="System"
+              description="Webhook auto-disabled and other system events"
+              checked={settings.notifySystem}
+              onChange={(v) => updateField("notifySystem", v)}
+            />
+          </div>
+        </section>
+
+        {/* Webhook Configuration */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div>
+            <h2 className="text-lg font-bold font-headline">Webhook Configuration</h2>
+            <p className="text-sm text-on-surface-variant mt-2">
+              Receive HMAC-signed POST requests for events.
+            </p>
+          </div>
+          <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
+                Webhook URL
+              </label>
+              <input
+                type="url"
+                name="webhookUrl"
+                value={settings.webhookUrl || ""}
+                onChange={(e) => updateField("webhookUrl", e.target.value)}
+                placeholder="https://your-server.com/webhook"
+                className="ghost-input font-mono text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
+                Signing Secret
+              </label>
+              <div className="font-mono text-xs text-on-surface-variant bg-surface-container px-4 py-3 rounded-lg break-all">
+                {revealedSecret ? (
+                  <span className="text-cyan-300">{revealedSecret}</span>
+                ) : (
+                  settings.webhookSecret || <span className="text-on-surface-variant/40">Not generated yet</span>
+                )}
+              </div>
+              {revealedSecret && (
+                <p className="text-xs text-amber-300 mt-2">
+                  Save this secret now. You won&apos;t be able to see it again.
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  fetcher.submit({ intent: "rotate-secret" }, { method: "post" });
+                }}
+                className="mt-3 text-xs font-bold text-primary hover:underline"
+              >
+                {settings.webhookSecret ? "Rotate secret" : "Generate secret"}
+              </button>
+            </div>
+
+            {settings.webhookDisabledAt && (
+              <div className="bg-red-500/10 border border-red-400/20 px-4 py-3 rounded-lg space-y-2">
+                <p className="text-xs font-bold text-red-300">
+                  Webhook auto-disabled
+                </p>
+                <p className="text-xs text-red-200/80">
+                  Reason: {settings.webhookDisabledReason || "Too many failures"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetcher.submit({ intent: "enable-webhook" }, { method: "post" });
+                  }}
+                  className="text-xs font-bold text-cyan-300 hover:underline"
+                >
+                  Re-enable webhook
+                </button>
+              </div>
+            )}
+
+            <div className="pt-2">
+              <Link to="/settings/webhooks" className="text-xs font-bold text-primary hover:underline">
+                View delivery log →
+              </Link>
+            </div>
           </div>
         </section>
 

@@ -188,8 +188,8 @@ export default function Orders() {
                       <OrderPill status={o.status} />
                     </td>
                     <td className="px-6 py-4">
-                      {o.escrow ? (
-                        <EscrowPill status={o.escrow.status} />
+                      {o.escrows && o.escrows.length > 0 ? (
+                        <EscrowPill status={o.escrows[0].status} />
                       ) : (
                         <span className="text-xs text-on-surface-variant/60">
                           —

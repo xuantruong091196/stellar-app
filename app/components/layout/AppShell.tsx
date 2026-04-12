@@ -1,6 +1,7 @@
 import { Link, useLocation, Form } from "@remix-run/react";
 import type { ReactNode } from "react";
 import { truncateAddress } from "~/lib/stellar";
+import { NotificationBell } from "~/components/NotificationBell";
 
 interface NavItem {
 	label: string;
@@ -86,6 +87,7 @@ export function AppShell({
 					</div>
 					{userAddress ? (
 						<div className="flex items-center gap-2">
+							<NotificationBell walletAddress={userAddress} />
 							<div className="flex items-center gap-3 bg-surface-container-low px-4 py-2 rounded-full">
 								<div className="w-6 h-6 rounded-full stellar-gradient" />
 								<span className="font-mono text-xs text-on-surface-variant">

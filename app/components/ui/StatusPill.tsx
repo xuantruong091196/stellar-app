@@ -43,6 +43,7 @@ export function Pill({
 
 const ESCROW_TONE: Record<EscrowStatus, PillTone> = {
   LOCKING: "slate",
+  LOCK_FAILED: "red",
   LOCKED: "amber",
   RELEASING: "indigo",
   RELEASED: "green",
