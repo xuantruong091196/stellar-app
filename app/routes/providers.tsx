@@ -29,15 +29,27 @@ export const meta: MetaFunction = () =>
   });
 
 
-const COUNTRIES = ["", "United States", "Germany", "Japan", "Brazil", "Sweden"];
-const SPECIALTIES = [
-  "",
-  "T-Shirts",
-  "Hoodies",
-  "Posters",
-  "Mugs",
-  "Phone Cases",
-  "Canvas",
+const COUNTRIES: Array<{ value: string; label: string }> = [
+  { value: "", label: "All Countries" },
+  { value: "US", label: "United States" },
+  { value: "UK", label: "United Kingdom" },
+  { value: "DE", label: "Germany" },
+  { value: "AU", label: "Australia" },
+  { value: "CA", label: "Canada" },
+  { value: "JP", label: "Japan" },
+  { value: "VN", label: "Vietnam" },
+  { value: "CN", label: "China" },
+  { value: "IN", label: "India" },
+];
+const SPECIALTIES: Array<{ value: string; label: string }> = [
+  { value: "", label: "All Specialties" },
+  { value: "dtg", label: "Direct to Garment (DTG)" },
+  { value: "sublimation", label: "Sublimation" },
+  { value: "embroidery", label: "Embroidery" },
+  { value: "all-over-print", label: "All-Over Print" },
+  { value: "screen-print", label: "Screen Print" },
+  { value: "cut-and-sew", label: "Cut & Sew" },
+  { value: "engraving", label: "Engraving" },
 ];
 const PRODUCT_TYPES = ["", "T-Shirt", "Hoodie", "Mug", "Poster", "Tote Bag"];
 
@@ -331,8 +343,8 @@ function ProvidersTab({
               className="w-full bg-surface-container text-on-surface rounded-xl px-4 py-3 border-0 focus:ring-2 focus:ring-primary"
             >
               {COUNTRIES.map((c) => (
-                <option key={c} value={c}>
-                  {c || "All Countries"}
+                <option key={c.value} value={c.value}>
+                  {c.label}
                 </option>
               ))}
             </select>
@@ -347,8 +359,8 @@ function ProvidersTab({
               className="w-full bg-surface-container text-on-surface rounded-xl px-4 py-3 border-0 focus:ring-2 focus:ring-primary"
             >
               {SPECIALTIES.map((s) => (
-                <option key={s} value={s}>
-                  {s || "All Specialties"}
+                <option key={s.value} value={s.value}>
+                  {s.label}
                 </option>
               ))}
             </select>
