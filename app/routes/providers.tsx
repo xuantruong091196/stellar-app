@@ -53,6 +53,23 @@ const SPECIALTIES: Array<{ value: string; label: string }> = [
 ];
 const PRODUCT_TYPES = ["", "T-Shirt", "Hoodie", "Mug", "Poster", "Tote Bag"];
 
+/** Map country codes to flag emoji + name for display */
+const COUNTRY_DISPLAY: Record<string, { flag: string; name: string }> = {
+  US: { flag: "\u{1F1FA}\u{1F1F8}", name: "United States" },
+  UK: { flag: "\u{1F1EC}\u{1F1E7}", name: "United Kingdom" },
+  DE: { flag: "\u{1F1E9}\u{1F1EA}", name: "Germany" },
+  AU: { flag: "\u{1F1E6}\u{1F1FA}", name: "Australia" },
+  CA: { flag: "\u{1F1E8}\u{1F1E6}", name: "Canada" },
+  JP: { flag: "\u{1F1EF}\u{1F1F5}", name: "Japan" },
+  VN: { flag: "\u{1F1FB}\u{1F1F3}", name: "Vietnam" },
+  CN: { flag: "\u{1F1E8}\u{1F1F3}", name: "China" },
+  IN: { flag: "\u{1F1EE}\u{1F1F3}", name: "India" },
+};
+function countryLabel(code: string) {
+  const c = COUNTRY_DISPLAY[code];
+  return c ? `${c.flag} ${c.name}` : code;
+}
+
 type Tab = "providers" | "catalog";
 
 interface LoaderData {
@@ -400,7 +417,7 @@ function ProvidersTab({
                     <div>
                       <h3 className="font-bold font-headline">{p.name}</h3>
                       <p className="text-xs text-on-surface-variant">
-                        {p.country}
+                        {countryLabel(p.country)}
                       </p>
                     </div>
                   </div>
