@@ -1,6 +1,26 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { Canvas as FabricCanvas } from "fabric";
 
+/** Proxy external CDN images through our server to avoid CORS issues */
+function proxyImageUrl(url: string): string {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    const needsProxy = [
+      "files.cdn.printful.com",
+      "static.cdn.printful.com",
+      "cdn.printify.com",
+      "images.printify.com",
+    ].includes(parsed.hostname);
+    if (needsProxy) {
+      return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+    }
+  } catch {
+    // not a valid URL, return as-is
+  }
+  return url;
+}
+
 export interface DisplayPrintArea {
   name: string;
   widthPx: number;
@@ -95,7 +115,7 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
         }
 
         // Load blank product image as background
-        const img = await fabric.FabricImage.fromURL(blankImageUrl, {
+        const img = await fabric.FabricImage.fromURL(proxyImageUrl(blankImageUrl), {
           crossOrigin: "anonymous",
         });
         if (disposed) return;
@@ -147,7 +167,7 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
       const p = paRef.current;
       const fabric = await import("fabric");
       try {
-        const img = await fabric.FabricImage.fromURL(imageUrl, {
+        const img = await fabric.FabricImage.fromURL(proxyImageUrl(imageUrl), {
           crossOrigin: "anonymous",
         });
         const maxW = p.displayWidth * 0.8;
