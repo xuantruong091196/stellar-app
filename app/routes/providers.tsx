@@ -51,7 +51,16 @@ const SPECIALTIES: Array<{ value: string; label: string }> = [
   { value: "cut-and-sew", label: "Cut & Sew" },
   { value: "engraving", label: "Engraving" },
 ];
-const PRODUCT_TYPES = ["", "T-Shirt", "Hoodie", "Mug", "Poster", "Tote Bag"];
+const PRODUCT_TYPES: Array<{ value: string; label: string }> = [
+  { value: "", label: "All Types" },
+  { value: "t-shirt", label: "T-Shirts" },
+  { value: "hoodie", label: "Hoodies" },
+  { value: "mug", label: "Mugs" },
+  { value: "poster", label: "Posters" },
+  { value: "tote-bag", label: "Tote Bags" },
+  { value: "phone-case", label: "Phone Cases" },
+  { value: "other", label: "Other" },
+];
 
 /** Map country codes to flag emoji + name for display */
 const COUNTRY_DISPLAY: Record<string, { flag: string; name: string }> = {
@@ -98,7 +107,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const productType = url.searchParams.get("productType") || "";
     const blanksParams = new URLSearchParams();
     blanksParams.set("page", page);
-    blanksParams.set("limit", "20");
+    blanksParams.set("limit", "24");
     if (productType)
       blanksParams.set("productType", productType);
 
@@ -522,19 +531,18 @@ function CatalogTab({
             Filter:
           </span>
           {PRODUCT_TYPES.map((type) => {
-            const label = type || "All Types";
-            const active = currentType === type;
+            const active = currentType === type.value;
             return (
               <button
-                key={label}
-                onClick={() => onTypeChange(type)}
+                key={type.value || "_all"}
+                onClick={() => onTypeChange(type.value)}
                 className={
                   active
                     ? "stellar-gradient text-white px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider"
                     : "bg-surface-container-high text-on-surface-variant hover:text-on-surface px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-colors"
                 }
               >
-                {label}
+                {type.label}
               </button>
             );
           })}
