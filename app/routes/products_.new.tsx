@@ -218,14 +218,38 @@ export default function CreateProduct() {
     }
   }, [preselectedBlankId, providerProducts, selectedProduct]);
 
+  /** Compute pricing locally for instant feedback (no API call needed) */
+  const computeLocalPricing = useCallback(
+    (price: number, product: ProviderProduct): PricingBreakdown => {
+      const baseCost = product.baseCost;
+      const platformFee = price * 0.05;
+      const profitMargin = price - baseCost - platformFee;
+      const profitPercent = price > 0 ? (profitMargin / price) * 100 : 0;
+      return {
+        baseCost,
+        retailPrice: price,
+        platformFee,
+        platformFeeRate: 0.05,
+        profitMargin,
+        profitPercent,
+      };
+    },
+    [],
+  );
+
   const fetchPricing = useCallback(
     (price: string) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       const numPrice = parseFloat(price);
       if (!selectedProduct || isNaN(numPrice) || numPrice <= 0) {
-        setPricing(null);
+        // Even with no valid price, show baseCost-based breakdown
+        if (selectedProduct) {
+          setPricing(computeLocalPricing(selectedProduct.baseCost, selectedProduct));
+        }
         return;
       }
+      // Instantly update with local calculation (no layout shift)
+      setPricing(computeLocalPricing(numPrice, selectedProduct));
       setPricingLoading(true);
       debounceRef.current = setTimeout(async () => {
         const res = await apiGet<PricingBreakdown>(
@@ -234,34 +258,38 @@ export default function CreateProduct() {
         );
         if (res.data) {
           setPricing(res.data);
-        } else {
-          const baseCost = selectedProduct.baseCost;
-          const platformFee = numPrice * 0.05;
-          const profitMargin = numPrice - baseCost - platformFee;
-          const profitPercent =
-            numPrice > 0 ? (profitMargin / numPrice) * 100 : 0;
-          setPricing({
-            baseCost,
-            retailPrice: numPrice,
-            platformFee,
-            platformFeeRate: 0.05,
-            profitMargin,
-            profitPercent,
-          });
         }
+        // If API fails, local calculation is already displayed
         setPricingLoading(false);
       }, 500);
     },
-    [selectedProduct, walletAddress],
+    [selectedProduct, walletAddress, computeLocalPricing],
   );
 
   const handleRetailPriceChange = useCallback(
     (v: string) => {
       setRetailPrice(v);
+      // Enforce minimum price >= baseCost
+      if (selectedProduct) {
+        const num = parseFloat(v);
+        if (!isNaN(num) && num < selectedProduct.baseCost && num > 0) {
+          // Don't block typing, just show negative margin in breakdown
+        }
+      }
       fetchPricing(v);
     },
-    [fetchPricing],
+    [fetchPricing, selectedProduct],
   );
+
+  // Auto-initialize pricing when product is selected
+  useEffect(() => {
+    if (selectedProduct && !pricing) {
+      const initialPrice = selectedProduct.baseCost * 2; // Default 2x markup
+      setRetailPrice(initialPrice.toFixed(2));
+      setPricing(computeLocalPricing(initialPrice, selectedProduct));
+      fetchPricing(initialPrice.toFixed(2));
+    }
+  }, [selectedProduct, pricing, computeLocalPricing, fetchPricing]);
 
   useEffect(() => {
     if (fetcher.data?.success && fetcher.data.intent === "create-draft" && fetcher.data.product) {
@@ -653,31 +681,23 @@ export default function CreateProduct() {
               </div>
             )}
 
-            <section className="bg-surface-container-low rounded-2xl p-6 space-y-4">
+            <section className="bg-surface-container-low rounded-2xl p-6 space-y-4 relative">
               <h2 className="text-lg font-bold font-headline">
                 Pricing Breakdown
               </h2>
+              {/* Always show pricing data — loading overlay on top */}
               {pricingLoading && (
-                <p className="text-on-surface-variant text-sm">
-                  Calculating...
-                </p>
-              )}
-              {!pricing && !pricingLoading && (
-                <div className="text-center py-6 space-y-2">
-                  <span className="material-symbols-outlined text-3xl text-on-surface-variant/30">
-                    calculate
-                  </span>
-                  <p className="text-xs text-on-surface-variant/60">
-                    Enter a retail price to see your profit breakdown
-                  </p>
-                  {selectedProduct && (
-                    <p className="text-[10px] text-on-surface-variant/40">
-                      Base cost: ${fmt(selectedProduct.baseCost)} + 5% platform fee
-                    </p>
-                  )}
+                <div className="absolute inset-0 bg-surface-container-low/60 backdrop-blur-[2px] rounded-2xl flex items-center justify-center z-10">
+                  <div className="flex items-center gap-2 text-on-surface-variant text-sm">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Updating...
+                  </div>
                 </div>
               )}
-              {pricing && !pricingLoading && (
+              {pricing ? (
                 <div className="space-y-3 text-sm">
                   <PricingRow
                     label="Retail Price"
@@ -707,6 +727,22 @@ export default function CreateProduct() {
                         ({fmt(pricing.profitPercent, 1)}%)
                       </span>
                     </span>
+                  </div>
+                  {(pricing.profitMargin ?? 0) < 0 && (
+                    <p className="text-xs text-red-400/80 mt-1">
+                      Price is below cost. Increase retail price above ${fmt(pricing.baseCost / 0.95)}.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3 text-sm opacity-40">
+                  <PricingRow label="Retail Price" value="$—" bold />
+                  <PricingRow label="Base Cost" value="-$—" />
+                  <PricingRow label="Platform Fee (5%)" value="-$—" />
+                  <div className="h-[1px] bg-outline-variant/20" />
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold">Your Profit</span>
+                    <span className="font-mono font-bold text-lg text-on-surface-variant/40">$—</span>
                   </div>
                 </div>
               )}
