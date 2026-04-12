@@ -101,16 +101,36 @@ export default function ProductDetail() {
 
   const images = useMemo(() => {
     if (!product) return [];
+
+    // Prefer composite mockups (design already placed on product)
+    const productType = providerProduct?.productType;
+    const mockups = product.design?.mockups || [];
+    const matching = productType
+      ? mockups.filter((m) => m.productType === productType)
+      : mockups;
+
+    if (matching.length > 0) {
+      return matching.map((m) => ({
+        url: m.imageUrl,
+        label: m.variant,
+      }));
+    }
+
+    // Fallback: blank product images + design thumbnail
+    // (only shown while mockups are being generated in background)
     const blankImages = providerProduct?.blankImages || {};
     const blankImgList = Object.entries(blankImages).map(([color, url]) => ({
       url: url as string,
       label: color,
     }));
-    const designThumb = product.design?.thumbnailUrl || product.design?.fileUrl;
-    if (designThumb) {
-      blankImgList.push({ url: designThumb, label: "Design" });
-    }
     return blankImgList;
+  }, [product, providerProduct]);
+
+  const isMockupPending = useMemo(() => {
+    if (!product?.design?.mockups) return false;
+    const productType = providerProduct?.productType;
+    if (!productType) return false;
+    return !product.design.mockups.some((m) => m.productType === productType);
   }, [product, providerProduct]);
 
   if (fetcher.data?.deleted) {
@@ -275,6 +295,17 @@ export default function ProductDetail() {
                 image
               </span>
             )}
+
+            {isMockupPending && (
+              <div className="absolute top-4 right-4 bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-2">
+                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Generating mockup...
+              </div>
+            )}
+
             {images[activeImage]?.label && (
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6">
                 <p className="text-white/80 font-headline text-sm">
