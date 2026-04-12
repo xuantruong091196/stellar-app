@@ -238,6 +238,15 @@ export interface MerchantProduct {
   updatedAt: string;
   design?: Design;
   providerProduct?: ProviderProduct;
+  store?: { shopifyDomain: string; name: string };
+  salesPerformance?: {
+    dailyBuckets: number[];
+    totalUnits: number;
+    totalRevenue: number;
+    changePercent: number;
+  };
+  technicalSpecs?: Array<{ label: string; value: string }>;
+  smartContractRules?: Array<{ icon: string; title: string; description: string }>;
 }
 
 export interface PricingBreakdown {
