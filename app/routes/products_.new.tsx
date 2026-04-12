@@ -967,7 +967,7 @@ function ProfitCalculator({
         <input
           type="range"
           min={0}
-          max={100}
+          max={95}
           step={1}
           value={targetMargin}
           onChange={(e) => {
