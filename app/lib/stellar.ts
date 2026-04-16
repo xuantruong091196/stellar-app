@@ -136,18 +136,17 @@ export function truncateAddress(addr: string): string {
   return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
 }
 
-/** Fetch USDC balance via stellarpod-api (falls back to 0.00 on error). */
-export async function getBalance(address: string): Promise<string> {
-  try {
-    const apiUrl =
-      typeof process !== "undefined"
-        ? process.env.STELLARPOD_API_URL || "http://localhost:3000"
-        : "http://localhost:3000";
-    const response = await fetch(`${apiUrl}/stellar/balance/${address}`);
-    if (!response.ok) return "0.00";
-    const data = (await response.json()) as { balance: number };
-    return String(data.balance ?? "0.00");
-  } catch {
-    return "0.00";
-  }
+/**
+ * Fetch USDC balance for a Stellar address.
+ *
+ * The original implementation called a non-existent backend endpoint
+ * (`/stellar/balance/:address`) from client-side code with the wrong
+ * origin — every wallet connect silently 404'd and returned 0.00. Until
+ * a real balance lookup endpoint (server-side, through the proxy route
+ * pattern) exists, return 0.00 without firing a dead fetch.
+ *
+ * Intentionally takes the address param so callers don't have to change.
+ */
+export async function getBalance(_address: string): Promise<string> {
+  return "0.00";
 }

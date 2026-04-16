@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
@@ -33,21 +33,39 @@ export const meta: MetaFunction = () =>
     noIndex: true,
   });
 
+function decodeToken(token: string): { sub: string } | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    return JSON.parse(
+      Buffer.from(parts[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"),
+    );
+  } catch {
+    return null;
+  }
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
-  // Provider auth comes from a session token stored in cookie or local storage
-  // For now, we expect a `provider_token` cookie
   const cookie = request.headers.get("cookie") || "";
   const tokenMatch = cookie.match(/provider_token=([^;]+)/);
   const token = tokenMatch?.[1];
 
-  if (!token) {
-    return redirect("/provider-onboarding");
-  }
+  const url = new URL(request.url);
+  const nextParam = encodeURIComponent(url.pathname + url.search);
+  if (!token) return redirect(`/provider-login?next=${nextParam}`);
 
-  // We need to fetch the provider's own settings — but we don't know providerId from cookie alone.
-  // The API endpoint /settings/provider/me would be cleaner, but we'll use the token to fetch
-  // the provider's profile first.
-  return json({ token, settings: null as ProviderSettings | null, error: null });
+  const payload = decodeToken(token);
+  if (!payload?.sub) return redirect(`/provider-login?next=${nextParam}`);
+
+  const providerId = payload.sub;
+  const res = await api<ProviderSettings>(`/settings/provider/${providerId}`, { token });
+
+  return json({
+    token,
+    providerId,
+    settings: res.data,
+    error: res.error,
+  });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -86,62 +104,15 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function ProviderSettings() {
-  const { token } = useLoaderData<typeof loader>();
+  const { providerId, settings: loaderSettings, error: loaderError } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
-  const [settings, setSettings] = useState<ProviderSettings | null>(null);
-  const [providerId, setProviderId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Fetch settings on mount (need providerId from token)
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchData() {
-      try {
-        // Decode JWT to get providerId (simple base64 decode of payload)
-        const parts = token.split(".");
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-          const id = payload.sub as string;
-          if (cancelled) return;
-          setProviderId(id);
-
-          const apiBase =
-            (typeof window !== "undefined" && window.ENV?.PUBLIC_API_URL) ||
-            "http://localhost:8000";
-          const res = await fetch(`${apiBase}/settings/provider/${id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (cancelled) return;
-          if (res.ok) {
-            const data = await res.json();
-            setSettings(data);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load provider settings:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    fetchData();
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
+  const [settings, setSettings] = useState<ProviderSettings | null>(loaderSettings ?? null);
 
   const updateField = <K extends keyof ProviderSettings>(key: K, value: ProviderSettings[K]) => {
     setSettings((prev) => (prev ? { ...prev, [key]: value } : null));
   };
 
-  if (loading) {
-    return (
-      <>
-        <PageHeader title="Provider Settings" subtitle="Loading..." />
-      </>
-    );
-  }
-
-  if (!settings || !providerId) {
+  if (loaderError || !settings || !providerId) {
     return (
       <>
         <PageHeader title="Provider Settings" />

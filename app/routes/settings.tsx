@@ -34,6 +34,11 @@ interface StoreSettings {
   notificationEmail: string | null;
   emailEnabled: boolean;
   inAppEnabled: boolean;
+  // Store-level fields merged from API
+  shopifyDomain: string | null;
+  shopifyConnected: boolean;
+  walletAddress: string | null;
+  stellarAddress: string | null;
 }
 
 export const meta: MetaFunction = () =>
@@ -48,12 +53,17 @@ export const meta: MetaFunction = () =>
 export async function loader({ request }: LoaderFunctionArgs) {
   const walletAddress = await requireUser(request);
   const storeId = deriveStoreId(walletAddress);
+  const url = new URL(request.url);
+  const shopifyLinked = url.searchParams.get("shopify") === "linked";
+  const linkedShop = url.searchParams.get("shop") ?? null;
   const res = await apiGet<StoreSettings>(`/settings/store/${storeId}`, walletAddress);
   return json({
     walletAddress,
     storeId,
     settings: res.data,
     error: res.error,
+    shopifyLinked,
+    linkedShop,
   });
 }
 
@@ -67,7 +77,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const updates = {
       storeName: formData.get("storeName") as string,
       locale: formData.get("locale") as string,
-      webhookUrl: formData.get("webhookUrl") as string || null,
+      webhookUrl: (formData.get("webhookUrl") as string) || null,
       webhookEnabled: formData.get("webhookEnabled") === "on",
       defaultMarkup: parseFloat(formData.get("defaultMarkup") as string),
       notifyOrders: formData.get("notifyOrders") === "on",
@@ -79,6 +89,7 @@ export async function action({ request }: ActionFunctionArgs) {
       notificationEmail: (formData.get("notificationEmail") as string) || null,
       emailEnabled: formData.get("emailEnabled") === "on",
       inAppEnabled: formData.get("inAppEnabled") === "on",
+      stellarAddress: (formData.get("stellarAddress") as string) || null,
     };
     const res = await apiPatch<StoreSettings>(
       `/settings/store/${storeId}`,
@@ -116,11 +127,11 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Settings() {
-  const { settings: initialSettings } = useLoaderData<typeof loader>();
+  const { settings: initialSettings, walletAddress: loaderWallet, shopifyLinked, linkedShop } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
 
   const [settings, setSettings] = useState<StoreSettings | null>(initialSettings);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [connectedWallet, setConnectedWallet] = useState<string | null>(loaderWallet);
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
 
   useEffect(() => {
@@ -133,7 +144,7 @@ export default function Settings() {
   const saved = fetcher.data?.success === true && fetcher.state === "idle";
 
   const handleWalletAddressChange = useCallback((address: string | null) => {
-    setWalletAddress(address);
+    setConnectedWallet(address);
   }, []);
 
   const updateField = <K extends keyof StoreSettings>(key: K, value: StoreSettings[K]) => {
@@ -155,6 +166,14 @@ export default function Settings() {
     <>
       <PageHeader title="Settings" subtitle="Configure your Stelo store" />
 
+      {shopifyLinked && (
+        <div className="bg-green-400/10 border border-green-400/20 text-green-200 px-6 py-4 rounded-2xl flex items-center gap-2">
+          <span className="material-symbols-outlined">check_circle</span>
+          <p className="text-sm font-bold">
+            Shopify store{linkedShop ? ` (${linkedShop})` : ""} connected successfully. Your wallet is now linked.
+          </p>
+        </div>
+      )}
       {saved && (
         <div className="bg-green-400/10 border border-green-400/20 text-green-200 px-6 py-4 rounded-2xl flex items-center gap-2">
           <span className="material-symbols-outlined">check_circle</span>
@@ -175,13 +194,19 @@ export default function Settings() {
           <div>
             <h2 className="text-lg font-bold font-headline">Stellar Wallet</h2>
             <p className="text-sm text-on-surface-variant mt-2">
-              Connect your Freighter wallet to manage escrow payments.
+              Your Freighter wallet is your identity on Stelo. It signs escrow transactions and links your account to Shopify.
             </p>
           </div>
           <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-4">
             <WalletConnect onAddressChange={handleWalletAddressChange} />
-            <p className="text-xs text-on-surface-variant pt-2">
-              Your wallet signs escrow transactions. Funds are held in USDC on the Stellar network until fulfillment is confirmed.
+            {settings?.walletAddress && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="material-symbols-outlined text-green-400 text-base">link</span>
+                <p className="text-xs text-green-300 font-mono break-all">{settings.walletAddress}</p>
+              </div>
+            )}
+            <p className="text-xs text-on-surface-variant pt-1">
+              USDC escrow funds are held on the Stellar network and released to your payout address on fulfillment.
             </p>
           </div>
         </section>
@@ -191,10 +216,24 @@ export default function Settings() {
           <div>
             <h2 className="text-lg font-bold font-headline">Shopify Store</h2>
             <p className="text-sm text-on-surface-variant mt-2">
-              Connect your Shopify store to publish products and receive orders automatically.
+              Connect your Shopify store to publish products and receive orders automatically. Your wallet will be linked on connect.
             </p>
           </div>
           <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-4">
+            {settings?.shopifyConnected ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-green-400">check_circle</span>
+                  <div>
+                    <p className="text-sm font-bold text-green-300">Connected</p>
+                    <p className="text-xs font-mono text-on-surface-variant">{settings.shopifyDomain}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-on-surface-variant">
+                  To switch stores, connect a new Shopify domain below. This will re-link your wallet.
+                </p>
+              </div>
+            ) : null}
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
@@ -210,15 +249,45 @@ export default function Settings() {
                   if (!shop) return;
                   const domain = shop.includes(".myshopify.com") ? shop : `${shop}.myshopify.com`;
                   const apiBase = typeof window !== "undefined" ? window.ENV?.PUBLIC_API_URL : "";
-                  window.location.href = `${apiBase}/auth/shopify/install?shop=${encodeURIComponent(domain)}`;
+                  const wallet = connectedWallet ?? settings?.walletAddress ?? "";
+                  const walletParam = wallet ? `&wallet=${encodeURIComponent(wallet)}` : "";
+                  window.location.href = `${apiBase}/auth/shopify/install?shop=${encodeURIComponent(domain)}${walletParam}`;
                 }}
                 className="stellar-gradient px-6 py-2.5 rounded-full text-white font-bold text-sm whitespace-nowrap hover:scale-105 active:scale-95 transition-transform"
               >
-                Connect Store
+                {settings?.shopifyConnected ? "Reconnect" : "Connect Store"}
               </button>
             </div>
             <p className="text-[10px] text-on-surface-variant/60">
-              You will be redirected to Shopify to authorize the Stelo app.
+              You will be redirected to Shopify to authorize the Stelo app, then returned here.
+            </p>
+          </div>
+        </section>
+
+        {/* Payout Address */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div>
+            <h2 className="text-lg font-bold font-headline">Payout Address</h2>
+            <p className="text-sm text-on-surface-variant mt-2">
+              The Stellar address that receives USDC when escrow is released. Defaults to your connected wallet.
+            </p>
+          </div>
+          <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
+                Stellar Payout Address
+              </label>
+              <input
+                type="text"
+                name="stellarAddress"
+                value={settings?.stellarAddress ?? connectedWallet ?? ""}
+                onChange={(e) => updateField("stellarAddress", e.target.value)}
+                placeholder="GXXXXXXX..."
+                className="ghost-input font-mono text-sm"
+              />
+            </div>
+            <p className="text-xs text-on-surface-variant">
+              You can use a cold wallet or exchange address as the payout destination — it doesn&apos;t have to be the same as your signing wallet.
             </p>
           </div>
         </section>

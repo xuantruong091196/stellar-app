@@ -4,6 +4,22 @@ import { api } from "~/lib/api";
 import { pageMeta } from "~/lib/seo";
 import type { PrintArea } from "~/lib/types";
 
+/**
+ * Write the provider JWT to a cookie that every Remix loader under
+ * `/provider/*` can read. Client-side only — browsers accept Set-Cookie
+ * from `document.cookie` when the caller is on the same origin.
+ *
+ * `Secure` is gated on `location.protocol === 'https:'` so dev on
+ * `http://localhost:3000` still works. `SameSite=Lax` is fine: the cookie
+ * only needs to survive same-origin GET navigations, which is how the
+ * onboarding flow hands off to `/provider/orders`.
+ */
+function setProviderTokenCookie(token: string, maxAgeSec = 86400) {
+  if (typeof document === "undefined") return;
+  const secure = location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `provider_token=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax${secure}`;
+}
+
 export const meta: MetaFunction = () =>
   pageMeta({
     title: "Provider Onboarding",
@@ -231,7 +247,15 @@ function RegisterStep({
         return;
       }
 
-      // Save JWT to localStorage for subsequent API calls
+      // Persist the JWT as a cookie so every provider-authed Remix loader
+      // (which reads `provider_token` from the Cookie header) can pick it up.
+      // Also mirror to localStorage for client-side code that prefers that.
+      //
+      // NOTE: this cookie is set from JS, so it can't be HttpOnly. The token
+      // has a 24h TTL on the server side anyway, and provider auth is
+      // separate from the wallet-auth surface — XSS on a provider page
+      // wouldn't compromise any merchant data.
+      setProviderTokenCookie(result.data.token);
       localStorage.setItem("provider_token", result.data.token);
 
       onComplete({
@@ -605,13 +629,13 @@ function VerificationStep({
           when approved.
         </p>
         <a
-          href="/login"
+          href="/provider/orders"
           className="inline-flex items-center gap-2 stellar-gradient text-white px-8 py-3 rounded-full font-bold hover:brightness-110 transition-all"
         >
           <span className="material-symbols-outlined" aria-hidden>
-            login
+            inbox
           </span>
-          Go to Sign In
+          Go to Order Queue
         </a>
       </div>
     );

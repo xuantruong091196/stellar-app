@@ -21,6 +21,14 @@ interface PrintAreaDef {
   dpi: number;
 }
 
+interface PrintConfigResult {
+  printArea: string;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+}
+
 interface DesignEditorProps {
   blankImageUrl: string;
   printAreas: PrintAreaDef[];
@@ -31,8 +39,63 @@ interface DesignEditorProps {
     printArea: string;
     layers: object;
     exportDataUrl: string;
+    printConfig: PrintConfigResult;
   }) => void;
   isSaving?: boolean;
+}
+
+/**
+ * Compute printConfig from the current Fabric canvas state.
+ *
+ * Reads the bounding rect of all user-placed objects (excluding the blank
+ * background and print-area overlay), then expresses their position and size
+ * relative to the print area so the mockup compositor can reproduce the exact
+ * placement on the real blank product photo.
+ *
+ * Coordinate system:
+ *   x / y  — offset of the design's center from the print area's center,
+ *             in real print pixels (canvas display pixels × pa.scale).
+ *   scale  — design's rendered width divided by print area display width.
+ *             1 = design fills the full width of the print area.
+ *   rotation — degrees taken from the first user object's angle.
+ */
+function computePrintConfig(
+  canvas: { getObjects: () => unknown[] },
+  pa: { x: number; y: number; displayWidth: number; displayHeight: number; scale: number },
+  printAreaName: string,
+): PrintConfigResult {
+  const userObjs = (canvas.getObjects() as any[]).filter(
+    (o) => o.name !== "__blank" && o.name !== "__printArea",
+  );
+
+  if (userObjs.length === 0) {
+    return { printArea: printAreaName, x: 0, y: 0, scale: 1, rotation: 0 };
+  }
+
+  // Aggregate bounding rect across all user objects (absolute coords)
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const obj of userObjs) {
+    const br = obj.getBoundingRect(true);
+    minX = Math.min(minX, br.left);
+    minY = Math.min(minY, br.top);
+    maxX = Math.max(maxX, br.left + br.width);
+    maxY = Math.max(maxY, br.top + br.height);
+  }
+
+  const designCenterX = (minX + maxX) / 2;
+  const designCenterY = (minY + maxY) / 2;
+  const designWidth   = maxX - minX;
+
+  const paCenterX = pa.x + pa.displayWidth / 2;
+  const paCenterY = pa.y + pa.displayHeight / 2;
+
+  // Convert canvas-pixel offsets to real print-pixel offsets
+  const x = Math.round((designCenterX - paCenterX) * pa.scale);
+  const y = Math.round((designCenterY - paCenterY) * pa.scale);
+  const scale = parseFloat((designWidth / pa.displayWidth).toFixed(4));
+  const rotation = userObjs[0].angle ?? 0;
+
+  return { printArea: printAreaName, x, y, scale, rotation };
 }
 
 const PANEL_TITLES: Record<PanelTab, string> = {
@@ -129,7 +192,8 @@ export function DesignEditor({
       } catch {
         console.warn("Export failed (tainted canvas), saving layers only");
       }
-      onSave({ printArea: activePrintArea, layers, exportDataUrl });
+      const printConfig = computePrintConfig(canvas, displayPrintArea, activePrintArea);
+      onSave({ printArea: activePrintArea, layers, exportDataUrl, printConfig });
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (err) {

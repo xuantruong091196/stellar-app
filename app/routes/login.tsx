@@ -34,13 +34,30 @@ export const meta: MetaFunction = () =>
     path: "/login",
   });
 
+/**
+ * Validate that a `next` redirect target is a safe in-app path.
+ *
+ * Rejects absolute URLs (http://, https://, //host.com), protocol-relative
+ * URLs, and anything that doesn't start with `/`. Falls back to `/dashboard`
+ * on any mismatch. This closes an open-redirect vulnerability — before this
+ * check, `/login?next=https://evil.com` would bounce the user off-site after
+ * sign-in.
+ */
+function safeNext(next: string | null | undefined): string {
+  if (!next || typeof next !== "string") return "/dashboard";
+  // Must start with a single `/` and not `//` (protocol-relative).
+  if (!next.startsWith("/") || next.startsWith("//")) return "/dashboard";
+  // Block backslash-based bypasses (some browsers normalize `/\evil.com`).
+  if (next.includes("\\")) return "/dashboard";
+  return next;
+}
+
 // ─── Loader: if already signed in, bounce to dashboard ───────────
 export async function loader({ request }: LoaderFunctionArgs) {
   const user = await getUserAddress(request);
   if (user) {
     const url = new URL(request.url);
-    const next = url.searchParams.get("next") || "/dashboard";
-    throw redirect(next);
+    throw redirect(safeNext(url.searchParams.get("next")));
   }
   return json({});
 }
@@ -82,7 +99,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "verify") {
     const address = formData.get("address") as string;
     const signature = formData.get("signature") as string;
-    const next = (formData.get("next") as string) || "/dashboard";
+    const next = safeNext(formData.get("next") as string | null);
 
     // eslint-disable-next-line no-console
 

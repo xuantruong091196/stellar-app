@@ -5,7 +5,7 @@ import type {
   MetaFunction,
 } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, useFetcher, Link } from "@remix-run/react";
+import { useLoaderData, useFetcher, useRevalidator, Link } from "@remix-run/react";
 import { apiGet, apiPost } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type { Order, Escrow, ProviderOrder } from "~/lib/types";
@@ -13,6 +13,7 @@ import { PageHeader } from "~/components/ui/PageHeader";
 import { Button } from "~/components/ui/Button";
 import { OrderPill, EscrowPill, Pill } from "~/components/ui/StatusPill";
 import { EscrowTimeline, ViewOnStellarButton } from "~/components/EscrowTimeline";
+import { SignEscrowButton } from "~/components/SignEscrowButton";
 import { pageMeta } from "~/lib/seo";
 
 export const meta: MetaFunction = () =>
@@ -35,7 +36,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const order = res.data!;
   const providerOrders: ProviderOrder[] =
     (order as Order & { providerOrders?: ProviderOrder[] }).providerOrders ?? [];
-  return json({ order, providerOrders });
+  return json({ order, providerOrders, walletAddress });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -92,7 +93,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function OrderDetail() {
-  const { order, providerOrders } = useLoaderData<typeof loader>();
+  const { order, providerOrders, walletAddress } = useLoaderData<typeof loader>();
   const escrow: Escrow | null =
     order.escrows && order.escrows.length > 0 ? order.escrows[0] : null;
   const fetcher = useFetcher<{
@@ -100,6 +101,7 @@ export default function OrderDetail() {
     success?: boolean;
     message?: string;
   }>();
+  const { revalidate } = useRevalidator();
 
   const [showRelease, setShowRelease] = useState(false);
   const [showDispute, setShowDispute] = useState(false);
@@ -307,22 +309,30 @@ export default function OrderDetail() {
                 label="Tracking"
                 value={order.trackingNumber || "Not yet available"}
               />
-              {order.trackingUrl && (
-                <div className="flex justify-between items-center">
-                  <span className="text-on-surface-variant">Track URL</span>
-                  <a
-                    href={order.trackingUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary font-bold hover:underline flex items-center gap-1"
-                  >
-                    Track Package
-                    <span className="material-symbols-outlined text-sm">
-                      open_in_new
-                    </span>
-                  </a>
-                </div>
-              )}
+              {(() => {
+                // Only render tracking link if it's a well-formed http(s) URL.
+                // Guards against `javascript:` / `data:` URIs slipping past the
+                // backend DTO check (defense in depth).
+                const url = order.trackingUrl?.trim() ?? "";
+                const safe = /^https?:\/\//i.test(url) ? url : null;
+                if (!safe) return null;
+                return (
+                  <div className="flex justify-between items-center">
+                    <span className="text-on-surface-variant">Track URL</span>
+                    <a
+                      href={safe}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary font-bold hover:underline flex items-center gap-1"
+                    >
+                      Track Package
+                      <span className="material-symbols-outlined text-sm">
+                        open_in_new
+                      </span>
+                    </a>
+                  </div>
+                );
+              })()}
               <Row
                 label="Shipped At"
                 value={
@@ -446,6 +456,15 @@ export default function OrderDetail() {
                 />
               </div>
               <div className="space-y-2 pt-2">
+                {escrow.status === "LOCKING" && escrow.providerOrderId && (
+                  <SignEscrowButton
+                    variant="block"
+                    escrowId={escrow.id}
+                    providerOrderId={escrow.providerOrderId}
+                    walletAddress={walletAddress}
+                    onSuccess={revalidate}
+                  />
+                )}
                 {escrow.status === "LOCKED" && (
                   <Button
                     className="w-full"

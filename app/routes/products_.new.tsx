@@ -74,10 +74,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const printConfig: PrintConfig = {
       printArea,
-      x: 0,
-      y: 0,
-      scale: 1,
-      rotation: 0,
+      x: parseFloat((formData.get("printConfigX") as string) || "0"),
+      y: parseFloat((formData.get("printConfigY") as string) || "0"),
+      scale: parseFloat((formData.get("printConfigScale") as string) || "1"),
+      rotation: parseFloat((formData.get("printConfigRotation") as string) || "0"),
     };
 
     const result = await apiPost<MerchantProduct>(
@@ -155,6 +155,7 @@ export default function CreateProduct() {
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const [editorLayers, setEditorLayers] = useState<object | null>(null);
   const [editorExportUrl, setEditorExportUrl] = useState<string | null>(null);
+  const [editorPrintConfig, setEditorPrintConfig] = useState<PrintConfig | null>(null);
   const [targetMargin, setTargetMargin] = useState(30);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -615,6 +616,7 @@ export default function CreateProduct() {
               setEditorLayers(data.layers);
               setEditorExportUrl(data.exportDataUrl);
               setSelectedPrintArea(data.printArea);
+              setEditorPrintConfig(data.printConfig);
             }}
             isSaving={isSubmitting}
           />
@@ -775,12 +777,23 @@ export default function CreateProduct() {
               />
               <input
                 type="hidden"
-                name="printConfig"
-                value={JSON.stringify({
-                  printArea: selectedPrintArea,
-                  layers: editorLayers,
-                  exportUrl: editorExportUrl,
-                })}
+                name="printConfigX"
+                value={editorPrintConfig?.x ?? 0}
+              />
+              <input
+                type="hidden"
+                name="printConfigY"
+                value={editorPrintConfig?.y ?? 0}
+              />
+              <input
+                type="hidden"
+                name="printConfigScale"
+                value={editorPrintConfig?.scale ?? 1}
+              />
+              <input
+                type="hidden"
+                name="printConfigRotation"
+                value={editorPrintConfig?.rotation ?? 0}
               />
               <Button
                 type="submit"

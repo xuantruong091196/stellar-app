@@ -48,6 +48,7 @@ const ESCROW_TONE: Record<EscrowStatus, PillTone> = {
   RELEASING: "indigo",
   RELEASED: "green",
   DISPUTED: "red",
+  REFUNDING: "indigo",
   REFUNDED: "slate",
   EXPIRED: "amber",
 };

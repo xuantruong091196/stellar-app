@@ -56,8 +56,10 @@ export function ShapesPanel({ onAddImage, apiBaseUrl }: ShapesPanelProps) {
       }
       setLoading(true);
       try {
+        // Server-side proxy: /api/clipart/search forwards to the API
+        // with the wallet session + proxy secret attached.
         const res = await fetch(
-          `${apiBaseUrl}/clipart/search?q=${encodeURIComponent(q)}&page=${p}&limit=24`,
+          `/api/clipart/search?q=${encodeURIComponent(q)}&page=${p}&limit=24`,
         );
         if (!res.ok) throw new Error("Search failed");
         const data = await res.json();

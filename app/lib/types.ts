@@ -131,12 +131,14 @@ export type EscrowStatus =
   | 'RELEASING'
   | 'RELEASED'
   | 'DISPUTED'
+  | 'REFUNDING'
   | 'REFUNDED'
   | 'EXPIRED';
 
 export interface Escrow {
   id: string;
   orderId: string;
+  providerOrderId: string | null;
   storeId: string;
   providerId: string | null;
   status: EscrowStatus;
@@ -316,6 +318,7 @@ export const ESCROW_STATUS_LABELS: Record<EscrowStatus, string> = {
   RELEASING: 'Releasing',
   RELEASED: 'Released',
   DISPUTED: 'Disputed',
+  REFUNDING: 'Refunding',
   REFUNDED: 'Refunded',
   EXPIRED: 'Expired',
 };

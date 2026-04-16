@@ -64,6 +64,15 @@ export async function api<T = unknown>(
 
   if (walletAddress) {
     headers["X-Wallet-Address"] = walletAddress;
+    // Shared secret that proves this request originated from the Remix
+    // backend (which verified SIWS at login), not an arbitrary HTTP
+    // client. The API refuses X-Wallet-Address headers without this.
+    // Only read on the server side — process.env is undefined in the
+    // browser bundle, and wallet-authed calls should only happen from
+    // loaders/actions anyway.
+    if (typeof process !== "undefined" && process.env?.STELO_PROXY_SECRET) {
+      headers["X-Stelo-Proxy-Secret"] = process.env.STELO_PROXY_SECRET;
+    }
   }
 
   if (token) {

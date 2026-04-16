@@ -115,7 +115,11 @@ export function AiToolsPanel({
       if (!base64) throw new Error("No design to enhance");
 
       const ratio = displayPrintArea.widthPx / displayPrintArea.heightPx;
-      const res = await fetch(`${apiBaseUrl}/clipart/ai-enhance`, {
+      // Route through the Remix server-side proxy: /api/clipart/ai-enhance.
+      // The browser can't auth directly to the API anymore — the proxy
+      // route attaches the wallet from the session and the proxy secret
+      // from process.env (server-only).
+      const res = await fetch(`/api/clipart/ai-enhance`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -155,7 +159,7 @@ export function AiToolsPanel({
     abortRef.current = new AbortController();
 
     try {
-      const res = await fetch(`${apiBaseUrl}/clipart/ai-remove-bg`, {
+      const res = await fetch(`/api/clipart/ai-remove-bg`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: base64 }),
@@ -200,7 +204,7 @@ export function AiToolsPanel({
     abortRef.current = new AbortController();
 
     try {
-      const res = await fetch(`${apiBaseUrl}/clipart/ai-generate`, {
+      const res = await fetch(`/api/clipart/ai-generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -234,7 +238,7 @@ export function AiToolsPanel({
     abortRef.current = new AbortController();
 
     try {
-      const res = await fetch(`${apiBaseUrl}/clipart/ai-upscale`, {
+      const res = await fetch(`/api/clipart/ai-upscale`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: base64, scale: upscaleScale }),

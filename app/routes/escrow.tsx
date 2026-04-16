@@ -4,12 +4,13 @@ import type {
   ActionFunctionArgs,
 } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, useFetcher, Link } from "@remix-run/react";
+import { useLoaderData, useFetcher, useRevalidator, Link } from "@remix-run/react";
 import { apiGet, apiPost , deriveStoreId } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type { Escrow, PaginatedResponse, EscrowStatus } from "~/lib/types";
 import { PageHeader, StatCard, EmptyState } from "~/components/ui/PageHeader";
 import { EscrowPill } from "~/components/ui/StatusPill";
+import { SignEscrowButton } from "~/components/SignEscrowButton";
 import { pageMeta } from "~/lib/seo";
 
 export const meta: MetaFunction = () =>
@@ -43,6 +44,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         activeCount: 0,
       },
       error: result.error || "Failed to load escrows",
+      walletAddress: null as string | null,
     });
   }
 
@@ -68,6 +70,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     escrows: all,
     meta: result.data.meta,
     summary,
+    walletAddress,
     error: null as string | null,
   });
 }
@@ -107,10 +110,16 @@ function formatDate(s: string | null): string {
 }
 
 export default function EscrowDashboard() {
-  const { escrows, summary, error } = useLoaderData<typeof loader>();
+  const { escrows, summary, walletAddress, error } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<{ success: boolean; error: string | null }>();
+  const { revalidate } = useRevalidator();
 
-  const activeStatuses: EscrowStatus[] = ["LOCKED", "LOCKING", "DISPUTED"];
+  const activeStatuses: EscrowStatus[] = [
+    "LOCKING",
+    "LOCK_FAILED",
+    "LOCKED",
+    "DISPUTED",
+  ];
   const historyStatuses: EscrowStatus[] = [
     "RELEASED",
     "RELEASING",
@@ -247,18 +256,18 @@ export default function EscrowDashboard() {
                       {formatDate(e.expiresAt)}
                     </td>
                     <td className="px-6 py-4">
+                      {e.status === "LOCKING" && e.providerOrderId && walletAddress && (
+                        <SignEscrowButton
+                          escrowId={e.id}
+                          providerOrderId={e.providerOrderId}
+                          walletAddress={walletAddress}
+                          onSuccess={revalidate}
+                        />
+                      )}
                       {e.status === "LOCKED" && (
                         <fetcher.Form method="post">
-                          <input
-                            type="hidden"
-                            name="intent"
-                            value="release"
-                          />
-                          <input
-                            type="hidden"
-                            name="escrowId"
-                            value={e.id}
-                          />
+                          <input type="hidden" name="intent" value="release" />
+                          <input type="hidden" name="escrowId" value={e.id} />
                           <button
                             type="submit"
                             disabled={releaseInFlight}
