@@ -62,14 +62,21 @@ export async function api<T = unknown>(
     ...customHeaders,
   };
 
-  if (walletAddress) {
+  // Route selection:
+  //   Server side (Remix loader/action): talk to the API directly and
+  //     attach X-Stelo-Proxy-Secret from process.env.
+  //   Browser side with a walletAddress: the API refuses X-Wallet-Address
+  //     without the proxy secret, and the secret must NEVER ship to the
+  //     client bundle. So we route the call through the Remix catchall
+  //     proxy at /api/proxy/<endpoint>, which re-reads the wallet from
+  //     the session cookie on the server and re-attaches the proxy secret.
+  //   Browser side without walletAddress (token-auth or unauthenticated):
+  //     hit the API directly as before.
+  const isServer = typeof window === "undefined";
+  const useProxy = !isServer && !!walletAddress;
+
+  if (walletAddress && !useProxy) {
     headers["X-Wallet-Address"] = walletAddress;
-    // Shared secret that proves this request originated from the Remix
-    // backend (which verified SIWS at login), not an arbitrary HTTP
-    // client. The API refuses X-Wallet-Address headers without this.
-    // Only read on the server side — process.env is undefined in the
-    // browser bundle, and wallet-authed calls should only happen from
-    // loaders/actions anyway.
     if (typeof process !== "undefined" && process.env?.STELO_PROXY_SECRET) {
       headers["X-Stelo-Proxy-Secret"] = process.env.STELO_PROXY_SECRET;
     }
@@ -79,8 +86,16 @@ export async function api<T = unknown>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
+  // Build the request URL. For proxied client calls we encode the
+  // upstream path + query under /api/proxy/<path>?<qs>. We rebuild the
+  // URL to separate path from query string so the Remix route can read
+  // them independently.
+  const requestUrl = useProxy
+    ? `/api/proxy${endpoint.startsWith("/") ? "" : "/"}${endpoint}`
+    : `${resolveApiBaseUrl()}${endpoint}`;
+
   try {
-    const response = await fetch(`${resolveApiBaseUrl()}${endpoint}`, {
+    const response = await fetch(requestUrl, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
