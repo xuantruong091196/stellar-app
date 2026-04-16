@@ -50,8 +50,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (response.status >= 300 && response.status < 400) {
       return new Response("Redirects not allowed", { status: 502 });
     }
+    // Pass through upstream 4xx (403/404) verbatim — otherwise a stale
+    // Printful URL surfaces as a generic "Upstream error" and the
+    // caller can't tell whether it's a temporary outage or a dead URL
+    // that needs a catalog re-sync.
+    if (response.status === 404 || response.status === 410) {
+      return new Response("Image not found at upstream", { status: 404 });
+    }
+    if (response.status === 403) {
+      return new Response("Image not accessible at upstream", { status: 404 });
+    }
     if (!response.ok) {
-      return new Response("Upstream error", { status: response.status });
+      return new Response("Upstream error", { status: 502 });
     }
 
     const contentType = response.headers.get("content-type") || "";

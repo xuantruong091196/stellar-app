@@ -114,22 +114,36 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
           return;
         }
 
-        // Load blank product image as background
-        const img = await fabric.FabricImage.fromURL(proxyImageUrl(blankImageUrl), {
-          crossOrigin: "anonymous",
-        });
-        if (disposed) return;
-        img.set({
-          selectable: false,
-          evented: false,
-          name: "__blank",
-        });
-        img.scaleToWidth(CANVAS_W);
-        const imgHeight = img.getScaledHeight();
-        img.set({ top: (CANVAS_H - imgHeight) / 2 });
-        img.setCoords();
-        c.add(img);
-        c.sendObjectToBack(img);
+        // Load blank product image as background. Don't abort the whole
+        // editor if the upstream CDN 403s or 404s (common with stale
+        // Printful catalog URLs — the URL pattern changes when the
+        // catalog gets re-synced). Fall back to a solid background
+        // placeholder so the designer can still work.
+        if (blankImageUrl) {
+          try {
+            const img = await fabric.FabricImage.fromURL(
+              proxyImageUrl(blankImageUrl),
+              { crossOrigin: "anonymous" },
+            );
+            if (disposed) return;
+            img.set({
+              selectable: false,
+              evented: false,
+              name: "__blank",
+            });
+            img.scaleToWidth(CANVAS_W);
+            const imgHeight = img.getScaledHeight();
+            img.set({ top: (CANVAS_H - imgHeight) / 2 });
+            img.setCoords();
+            c.add(img);
+            c.sendObjectToBack(img);
+          } catch (imgErr) {
+            console.warn(
+              `Blank image failed to load (${blankImageUrl}); continuing with placeholder background:`,
+              imgErr,
+            );
+          }
+        }
 
         // Snap guides (center)
         c.on("object:moving", (e) => {
