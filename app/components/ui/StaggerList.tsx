@@ -3,14 +3,14 @@ import type { ReactNode } from "react";
 
 const container = {
   animate: { transition: { staggerChildren: 0.05 } },
-};
+} as const;
 
 const item = {
   initial: { opacity: 0, y: 16 },
   animate: {
     opacity: 1,
     y: 0,
-    transition: { type: "spring", stiffness: 260, damping: 20 },
+    transition: { type: "spring" as const, stiffness: 260, damping: 20 },
   },
 };
 
