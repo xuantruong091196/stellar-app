@@ -16,6 +16,7 @@ import { json } from "@remix-run/node";
 import appStyles from "~/styles/app.css?url";
 import { AppShell } from "~/components/layout/AppShell";
 import { ToastProvider } from "~/components/ui/Toast";
+import { CommandPalette } from "~/components/ui/CommandPalette";
 import { getUserAddress } from "~/lib/session.server";
 import { pageMeta, SITE } from "~/lib/seo";
 
@@ -98,6 +99,7 @@ export default function App() {
             <AppShell userAddress={userAddress}>
               <Outlet />
             </AppShell>
+            <CommandPalette />
           </ToastProvider>
         )}
         <ScrollRestoration />
