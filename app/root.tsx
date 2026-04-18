@@ -15,6 +15,7 @@ import type {
 import { json } from "@remix-run/node";
 import appStyles from "~/styles/app.css?url";
 import { AppShell } from "~/components/layout/AppShell";
+import { ToastProvider } from "~/components/ui/Toast";
 import { getUserAddress } from "~/lib/session.server";
 import { pageMeta, SITE } from "~/lib/seo";
 
@@ -93,9 +94,11 @@ export default function App() {
         {isBareRoute ? (
           <Outlet />
         ) : (
-          <AppShell userAddress={userAddress}>
-            <Outlet />
-          </AppShell>
+          <ToastProvider>
+            <AppShell userAddress={userAddress}>
+              <Outlet />
+            </AppShell>
+          </ToastProvider>
         )}
         <ScrollRestoration />
         <script
