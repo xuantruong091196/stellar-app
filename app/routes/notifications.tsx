@@ -6,6 +6,9 @@ import { requireUser } from "~/lib/session.server";
 import { PageHeader } from "~/components/ui/PageHeader";
 import { Button } from "~/components/ui/Button";
 import { pageMeta } from "~/lib/seo";
+import { AnimatedPage } from "~/components/ui/AnimatedPage";
+import { StaggerList, StaggerItem } from "~/components/ui/StaggerList";
+import { EmptyState } from "~/components/ui/EmptyState";
 
 interface Notification {
   id: string;
@@ -139,7 +142,7 @@ export default function NotificationsPage() {
   };
 
   return (
-    <>
+    <AnimatedPage>
       <PageHeader
         title="Notifications"
         subtitle={meta ? `${meta.total} total` : "Your notification history"}
@@ -188,19 +191,13 @@ export default function NotificationsPage() {
 
       {/* Notification list */}
       {notifications.length === 0 ? (
-        <section className="bg-surface-container-low rounded-2xl p-12 text-center">
-          <span className="material-symbols-outlined text-5xl text-on-surface-variant/30">
-            notifications_off
-          </span>
-          <p className="text-sm text-on-surface-variant mt-4">No notifications found</p>
-          {(currentCategory || currentUnread) && (
-            <p className="text-xs text-on-surface-variant/60 mt-2">
-              Try clearing filters to see all notifications
-            </p>
-          )}
-        </section>
+        <EmptyState
+          icon="notifications"
+          title="No notifications"
+          description="You'll see order updates, escrow alerts, and system messages here."
+        />
       ) : (
-        <section className="bg-surface-container-low rounded-2xl divide-y divide-outline-variant/10">
+        <StaggerList className="bg-surface-container-low rounded-2xl divide-y divide-outline-variant/10">
           {notifications.map((n) => {
             const isUnread = !n.readAt;
             const icon = CATEGORY_ICONS[n.category] || "notifications";
@@ -251,15 +248,19 @@ export default function NotificationsPage() {
               </div>
             );
 
-            return n.link ? (
-              <Link key={n.id} to={n.link} onClick={() => isUnread && markAsRead(n.id)}>
-                {content}
-              </Link>
-            ) : (
-              <div key={n.id}>{content}</div>
+            return (
+              <StaggerItem key={n.id}>
+                {n.link ? (
+                  <Link to={n.link} onClick={() => isUnread && markAsRead(n.id)}>
+                    {content}
+                  </Link>
+                ) : (
+                  <div>{content}</div>
+                )}
+              </StaggerItem>
             );
           })}
-        </section>
+        </StaggerList>
       )}
 
       {/* Pagination */}
@@ -282,6 +283,6 @@ export default function NotificationsPage() {
           </div>
         </section>
       )}
-    </>
+    </AnimatedPage>
   );
 }

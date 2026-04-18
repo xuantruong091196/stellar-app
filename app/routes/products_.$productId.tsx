@@ -10,6 +10,7 @@ import { apiGet, apiPost, apiDelete } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type { MerchantProduct } from "~/lib/types";
 import { pageMeta } from "~/lib/seo";
+import { AnimatedPage } from "~/components/ui/AnimatedPage";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -140,7 +141,7 @@ export default function ProductDetail() {
 
   if (error || !product) {
     return (
-      <>
+      <AnimatedPage>
         <div className="flex items-center gap-3 text-sm">
           <Link
             to="/products"
@@ -153,7 +154,7 @@ export default function ProductDetail() {
         <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-6 py-4 rounded-2xl mt-4">
           <p className="text-sm">{error || "Product not found"}</p>
         </div>
-      </>
+      </AnimatedPage>
     );
   }
 
@@ -180,7 +181,7 @@ export default function ProductDetail() {
   const rules = product.smartContractRules || [];
 
   return (
-    <>
+    <AnimatedPage>
       {/* Breadcrumb */}
       <div className="flex items-center gap-3 text-sm">
         <Link
@@ -719,7 +720,7 @@ export default function ProductDetail() {
           </div>
         </details>
       )}
-    </>
+    </AnimatedPage>
   );
 }
 

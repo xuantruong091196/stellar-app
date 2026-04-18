@@ -12,6 +12,10 @@ import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
 import { LinkButton } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/StatusPill";
 import { pageMeta } from "~/lib/seo";
+import { AnimatedPage } from "~/components/ui/AnimatedPage";
+import { StaggerList, StaggerItem } from "~/components/ui/StaggerList";
+import { TiltCard } from "~/components/ui/TiltCard";
+import { EmptyState as AnimatedEmptyState } from "~/components/ui/EmptyState";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -71,7 +75,7 @@ export default function Designs() {
   const fetcher = useFetcher<{ error?: string }>();
 
   return (
-    <>
+    <AnimatedPage>
       <PageHeader
         title="Designs Library"
         subtitle="Your blockchain-protected design assets"
@@ -94,18 +98,13 @@ export default function Designs() {
       )}
 
       {designs.length === 0 ? (
-        <section className="bg-surface-container-low rounded-2xl">
-          <EmptyState
-            icon="palette"
-            title="Upload your first design"
-            description="Upload designs to start creating print-on-demand products with copyright protection on the Stellar blockchain."
-            action={
-              <LinkButton to="/designs/upload" icon="upload">
-                Upload Design
-              </LinkButton>
-            }
-          />
-        </section>
+        <AnimatedEmptyState
+          icon="palette"
+          title="No designs uploaded"
+          description="Upload your first design to start creating products."
+          actionLabel="Upload Design"
+          actionHref="/designs/upload"
+        />
       ) : (
         <>
           <p className="text-sm text-on-surface-variant font-mono">
@@ -115,15 +114,13 @@ export default function Designs() {
             </span>
           </p>
 
-          <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <StaggerList className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {designs.map((d) => {
               const status = copyrightStatus(d);
               const img = d.thumbnailUrl || d.fileUrl;
               return (
-                <div
-                  key={d.id}
-                  className="bg-surface-container-low rounded-2xl overflow-hidden group"
-                >
+                <StaggerItem key={d.id}>
+                <TiltCard className="bg-surface-container-low rounded-2xl overflow-hidden group">
                   <div className="relative">
                     <div className="aspect-square bg-surface-container-highest flex items-center justify-center overflow-hidden">
                       {img ? (
@@ -194,12 +191,13 @@ export default function Designs() {
                       </fetcher.Form>
                     </div>
                   </div>
-                </div>
+                </TiltCard>
+                </StaggerItem>
               );
             })}
-          </section>
+          </StaggerList>
         </>
       )}
-    </>
+    </AnimatedPage>
   );
 }

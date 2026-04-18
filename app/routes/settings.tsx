@@ -13,6 +13,8 @@ import { PageHeader } from "~/components/ui/PageHeader";
 import { Button } from "~/components/ui/Button";
 import { Pill } from "~/components/ui/StatusPill";
 import { pageMeta } from "~/lib/seo";
+import { AnimatedPage } from "~/components/ui/AnimatedPage";
+import { Collapsible } from "~/components/ui/Collapsible";
 
 interface StoreSettings {
   id: string;
@@ -153,17 +155,17 @@ export default function Settings() {
 
   if (!settings) {
     return (
-      <>
+      <AnimatedPage>
         <PageHeader title="Settings" subtitle="Configure your Stelo store" />
         <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-6 py-4 rounded-2xl">
           <p>Failed to load settings.</p>
         </div>
-      </>
+      </AnimatedPage>
     );
   }
 
   return (
-    <>
+    <AnimatedPage>
       <PageHeader title="Settings" subtitle="Configure your Stelo store" />
 
       {shopifyLinked && (
@@ -265,6 +267,7 @@ export default function Settings() {
         </section>
 
         {/* Payout Address */}
+        <Collapsible title="Advanced: Payout Address">
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div>
             <h2 className="text-lg font-bold font-headline">Payout Address</h2>
@@ -291,6 +294,7 @@ export default function Settings() {
             </p>
           </div>
         </section>
+        </Collapsible>
 
         {/* Store Settings */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -469,6 +473,7 @@ export default function Settings() {
         </section>
 
         {/* Webhook Configuration */}
+        <Collapsible title="Advanced: Webhook Configuration">
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div>
             <h2 className="text-lg font-bold font-headline">Webhook Configuration</h2>
@@ -545,6 +550,7 @@ export default function Settings() {
             </div>
           </div>
         </section>
+        </Collapsible>
 
         <div className="flex items-center justify-end pt-4">
           <Button type="submit" disabled={isSaving} icon="save">
@@ -552,7 +558,7 @@ export default function Settings() {
           </Button>
         </div>
       </fetcher.Form>
-    </>
+    </AnimatedPage>
   );
 }
 

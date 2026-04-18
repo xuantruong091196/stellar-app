@@ -12,6 +12,9 @@ import { PageHeader, StatCard, EmptyState } from "~/components/ui/PageHeader";
 import { EscrowPill } from "~/components/ui/StatusPill";
 import { SignEscrowButton } from "~/components/SignEscrowButton";
 import { pageMeta } from "~/lib/seo";
+import { AnimatedPage } from "~/components/ui/AnimatedPage";
+import { StaggerList, StaggerItem } from "~/components/ui/StaggerList";
+import { EmptyState as AnimatedEmptyState } from "~/components/ui/EmptyState";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -137,7 +140,7 @@ export default function EscrowDashboard() {
   const releaseInFlight = fetcher.state !== "idle";
 
   return (
-    <>
+    <AnimatedPage>
       <PageHeader
         title="Escrow Dashboard"
         subtitle="Stellar-powered escrow for every order"
@@ -155,38 +158,46 @@ export default function EscrowDashboard() {
         </div>
       )}
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          icon="lock"
-          iconColor="text-amber-400"
-          label="Total Locked"
-          value={`$${summary.totalLocked.toFixed(2)}`}
-          hint="Awaiting"
-        />
-        <StatCard
-          icon="check_circle"
-          iconColor="text-green-400"
-          label="Total Released"
-          value={`$${summary.totalReleased.toFixed(2)}`}
-          hint="Settled"
-          hintColor="text-green-400"
-        />
-        <StatCard
-          icon="warning"
-          iconColor="text-red-400"
-          label="Disputed"
-          value={`$${summary.totalDisputed.toFixed(2)}`}
-          hint="Attention"
-          hintColor="text-red-400"
-        />
-        <StatCard
-          icon="bolt"
-          iconColor="text-[#6366F1]"
-          label="Active Escrows"
-          value={summary.activeCount}
-          hint="Live"
-        />
-      </section>
+      <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StaggerItem>
+          <StatCard
+            icon="lock"
+            iconColor="text-amber-400"
+            label="Total Locked"
+            value={`$${summary.totalLocked.toFixed(2)}`}
+            hint="Awaiting"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            icon="check_circle"
+            iconColor="text-green-400"
+            label="Total Released"
+            value={`$${summary.totalReleased.toFixed(2)}`}
+            hint="Settled"
+            hintColor="text-green-400"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            icon="warning"
+            iconColor="text-red-400"
+            label="Disputed"
+            value={`$${summary.totalDisputed.toFixed(2)}`}
+            hint="Attention"
+            hintColor="text-red-400"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            icon="bolt"
+            iconColor="text-[#6366F1]"
+            label="Active Escrows"
+            value={summary.activeCount}
+            hint="Live"
+          />
+        </StaggerItem>
+      </StaggerList>
 
       {/* Active */}
       <section className="bg-surface-container-low rounded-2xl overflow-hidden">
@@ -343,6 +354,6 @@ export default function EscrowDashboard() {
           </div>
         )}
       </section>
-    </>
+    </AnimatedPage>
   );
 }

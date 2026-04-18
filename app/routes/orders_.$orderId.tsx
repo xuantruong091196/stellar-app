@@ -15,6 +15,7 @@ import { OrderPill, EscrowPill, Pill } from "~/components/ui/StatusPill";
 import { EscrowTimeline, ViewOnStellarButton } from "~/components/EscrowTimeline";
 import { SignEscrowButton } from "~/components/SignEscrowButton";
 import { pageMeta } from "~/lib/seo";
+import { AnimatedPage } from "~/components/ui/AnimatedPage";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -112,7 +113,7 @@ export default function OrderDetail() {
   const shippingAddress = order.shippingAddress as Record<string, string> | null;
 
   return (
-    <>
+    <AnimatedPage>
       <div className="flex items-center gap-3 text-sm">
         <Link
           to="/orders"
@@ -534,7 +535,7 @@ export default function OrderDetail() {
           )}
         </div>
       </div>
-    </>
+    </AnimatedPage>
   );
 }
 

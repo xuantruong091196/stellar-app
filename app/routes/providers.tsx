@@ -18,6 +18,9 @@ import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
 import { Pill } from "~/components/ui/StatusPill";
 import { LinkButton, Button } from "~/components/ui/Button";
 import { pageMeta } from "~/lib/seo";
+import { AnimatedPage } from "~/components/ui/AnimatedPage";
+import { StaggerList, StaggerItem } from "~/components/ui/StaggerList";
+import { EmptyState as AnimatedEmptyState } from "~/components/ui/EmptyState";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -247,7 +250,7 @@ export default function Providers() {
   );
 
   return (
-    <>
+    <AnimatedPage>
       <PageHeader
         title="Print Providers"
         subtitle="Browse partners on the Stellar network and their blank catalog"
@@ -311,7 +314,7 @@ export default function Providers() {
       {selected && (
         <BlankDetailModal blank={selected} onClose={() => setSelected(null)} />
       )}
-    </>
+    </AnimatedPage>
   );
 }
 
@@ -402,20 +405,18 @@ function ProvidersTab({
       </p>
 
       {filtered.length === 0 ? (
-        <section className="bg-surface-container-low rounded-2xl">
-          <EmptyState
-            icon="local_shipping"
-            title="No providers found"
-            description="Try adjusting your filters or search."
-          />
-        </section>
+        <AnimatedEmptyState
+          icon="local_shipping"
+          title="No providers connected"
+          description="Connect a print provider to start fulfilling orders."
+        />
       ) : (
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((p) => {
             const isConnected = connectedProviderIds.includes(p.id);
             return (
+              <StaggerItem key={p.id}>
               <div
-                key={p.id}
                 className="bg-surface-container-low p-6 rounded-2xl space-y-4 hover:bg-surface-container transition-colors"
               >
                 <div className="flex items-start justify-between">
@@ -497,9 +498,10 @@ function ProvidersTab({
                   </button>
                 </div>
               </div>
+              </StaggerItem>
             );
           })}
-        </section>
+        </StaggerList>
       )}
     </>
   );
