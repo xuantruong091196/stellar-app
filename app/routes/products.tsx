@@ -22,6 +22,9 @@ import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
 import { LinkButton, Button } from "~/components/ui/Button";
 import { ProductPill } from "~/components/ui/StatusPill";
 import { pageMeta } from "~/lib/seo";
+import { AnimatedPage } from "~/components/ui/AnimatedPage";
+import { StaggerList, StaggerItem } from "~/components/ui/StaggerList";
+import { EmptyState as AnimatedEmptyState } from "~/components/ui/EmptyState";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -112,7 +115,7 @@ export default function Products() {
   const tabs = ["All", "Draft", "Published"];
 
   return (
-    <>
+    <AnimatedPage>
       <PageHeader
         title="Products"
         subtitle="Manage your print-on-demand catalog"
@@ -155,18 +158,13 @@ export default function Products() {
 
       {/* Products Grid */}
       {products.length === 0 ? (
-        <section className="bg-surface-container-low rounded-2xl">
-          <EmptyState
-            icon="inventory_2"
-            title="Create your first product"
-            description="Choose a blank from the catalog, add your design, set your price, and publish to Shopify."
-            action={
-              <LinkButton to="/products/new" icon="add">
-                Create Product
-              </LinkButton>
-            }
-          />
-        </section>
+        <AnimatedEmptyState
+          icon="inventory_2"
+          title="No products yet"
+          description="Create your first product to start selling on Shopify."
+          actionLabel="Create Product"
+          actionHref="/products/new"
+        />
       ) : (
         <section className="bg-surface-container-low rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -326,6 +324,6 @@ export default function Products() {
           </div>
         </section>
       )}
-    </>
+    </AnimatedPage>
   );
 }

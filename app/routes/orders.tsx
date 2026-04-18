@@ -10,6 +10,9 @@ import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
 import { Button } from "~/components/ui/Button";
 import { OrderPill, EscrowPill } from "~/components/ui/StatusPill";
 import { pageMeta } from "~/lib/seo";
+import { AnimatedPage } from "~/components/ui/AnimatedPage";
+import { StaggerList, StaggerItem } from "~/components/ui/StaggerList";
+import { EmptyState as AnimatedEmptyState } from "~/components/ui/EmptyState";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -89,7 +92,7 @@ export default function Orders() {
     : orders;
 
   return (
-    <>
+    <AnimatedPage>
       <PageHeader
         title="Orders & Escrow"
         subtitle="Track every order from escrow to delivery"
@@ -141,13 +144,11 @@ export default function Orders() {
       </section>
 
       {filtered.length === 0 ? (
-        <section className="bg-surface-container-low rounded-2xl">
-          <EmptyState
-            icon="shopping_cart"
-            title="No orders yet"
-            description="Orders placed on your Shopify store will appear here."
-          />
-        </section>
+        <AnimatedEmptyState
+          icon="shopping_cart"
+          title="No orders yet"
+          description="Orders will appear here when customers purchase your products."
+        />
       ) : (
         <section className="bg-surface-container-low rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -243,6 +244,6 @@ export default function Orders() {
           </div>
         </section>
       )}
-    </>
+    </AnimatedPage>
   );
 }
