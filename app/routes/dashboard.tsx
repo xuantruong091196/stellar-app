@@ -13,6 +13,9 @@ import { PageHeader, StatCard, SectionCard, EmptyState } from "~/components/ui/P
 import { LinkButton } from "~/components/ui/Button";
 import { EscrowPill } from "~/components/ui/StatusPill";
 import { pageMeta } from "~/lib/seo";
+import { AnimatedPage } from "~/components/ui/AnimatedPage";
+import { StaggerList, StaggerItem } from "~/components/ui/StaggerList";
+import { CountUp } from "~/components/ui/CountUp";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -81,7 +84,7 @@ export default function Dashboard() {
   } = useLoaderData<typeof loader>();
 
   return (
-    <>
+    <AnimatedPage>
       <PageHeader
         title="Stelo Dashboard"
         subtitle="Your print-on-demand mission control"
@@ -96,15 +99,13 @@ export default function Dashboard() {
 
       {/* Hero Card */}
       <section className="stellar-gradient h-[200px] rounded-[28px] relative overflow-hidden flex items-center justify-between px-6 md:px-10">
-        <div className="absolute inset-0 opacity-20 pointer-events-none" />
+        <div className="absolute inset-0 opacity-20 pointer-events-none ambient-gradient" />
         <div className="relative z-10 space-y-2">
           <h2 className="text-white/80 text-lg font-headline">
             Good morning, Merchant
           </h2>
           <div className="flex items-baseline gap-3">
-            <span className="text-4xl md:text-5xl font-headline font-extrabold text-white">
-              ${totalRevenue.toFixed(2)}
-            </span>
+            <CountUp end={totalRevenue} prefix="$" decimals={2} className="text-4xl md:text-5xl font-headline font-extrabold text-white" />
             <span className="text-cyan-300 font-mono font-bold">USDC</span>
           </div>
           <div className="flex items-center gap-3 pt-2">
@@ -140,37 +141,45 @@ export default function Dashboard() {
       </section>
 
       {/* Stat Cards */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          icon="pending_actions"
-          iconColor="text-amber-400"
-          label="Pending Orders"
-          value={orderSummary.pending}
-          hint="Live Status"
-        />
-        <StatCard
-          icon="factory"
-          iconColor="text-[#6366F1]"
-          label="In Production"
-          value={orderSummary.inProduction}
-          hint="Active"
-        />
-        <StatCard
-          icon="local_shipping"
-          iconColor="text-[#5de6ff]"
-          label="Shipped / Delivered"
-          value={orderSummary.shipped}
-          hint="On Track"
-        />
-        <StatCard
-          icon="account_balance"
-          iconColor="text-green-400"
-          label="Total Revenue"
-          value={`$${totalRevenue.toFixed(0)}`}
-          hint="Released"
-          hintColor="text-green-400"
-        />
-      </section>
+      <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StaggerItem>
+          <StatCard
+            icon="pending_actions"
+            iconColor="text-amber-400"
+            label="Pending Orders"
+            value={<CountUp end={orderSummary.pending} />}
+            hint="Live Status"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            icon="factory"
+            iconColor="text-[#6366F1]"
+            label="In Production"
+            value={<CountUp end={orderSummary.inProduction} />}
+            hint="Active"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            icon="local_shipping"
+            iconColor="text-[#5de6ff]"
+            label="Shipped / Delivered"
+            value={<CountUp end={orderSummary.shipped} />}
+            hint="On Track"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            icon="account_balance"
+            iconColor="text-green-400"
+            label="Total Revenue"
+            value={<CountUp end={totalRevenue} prefix="$" decimals={2} />}
+            hint="Released"
+            hintColor="text-green-400"
+          />
+        </StaggerItem>
+      </StaggerList>
 
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -282,7 +291,7 @@ export default function Dashboard() {
           </div>
         </section>
       </div>
-    </>
+    </AnimatedPage>
   );
 }
 

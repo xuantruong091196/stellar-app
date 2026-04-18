@@ -61,7 +61,7 @@ export function StatCard({
   icon: string;
   iconColor: string;
   label: string;
-  value: string | number;
+  value: ReactNode;
   hint?: string;
   hintColor?: string;
 }) {
