@@ -415,9 +415,9 @@ function ProvidersTab({
           {filtered.map((p) => {
             const isConnected = connectedProviderIds.includes(p.id);
             return (
-              <StaggerItem key={p.id}>
+              <StaggerItem key={p.id} className="h-full">
               <div
-                className="bg-surface-container-low p-6 rounded-2xl space-y-4 hover:bg-surface-container transition-colors"
+                className="bg-surface-container-low p-6 rounded-2xl space-y-4 hover:bg-surface-container transition-colors flex flex-col h-full"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -477,7 +477,7 @@ function ProvidersTab({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1 flex-1">
                   {p.specialties.slice(0, 3).map((s) => (
                     <Pill key={s} tone="indigo">
                       {s}
@@ -485,7 +485,7 @@ function ProvidersTab({
                   ))}
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-2 mt-auto">
                   <button
                     onClick={() => onConnect(p.id)}
                     className={
