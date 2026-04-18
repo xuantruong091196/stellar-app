@@ -1,13 +1,14 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
-import { json } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { apiGet , deriveStoreId } from "~/lib/api";
+import { apiGet, deriveStoreId } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type {
   Order,
   Escrow,
   MerchantProduct,
   PaginatedResponse,
+  Store,
 } from "~/lib/types";
 import { PageHeader, StatCard, SectionCard, EmptyState } from "~/components/ui/PageHeader";
 import { LinkButton } from "~/components/ui/Button";
@@ -29,6 +30,16 @@ export const meta: MetaFunction = () =>
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const walletAddress = await requireUser(request);
+  const storeId = deriveStoreId(walletAddress);
+
+  // Check if the merchant needs onboarding — a wallet-only stub store
+  // (domain ends with .stelo.life) means Shopify hasn't been connected yet.
+  const storeRes = await apiGet<Store>(`/stores/${storeId}`, walletAddress);
+  const shopifyDomain = storeRes.data?.shopifyDomain ?? "";
+  if (!shopifyDomain || shopifyDomain.endsWith(".stelo.life")) {
+    throw redirect("/onboarding");
+  }
+
   const [ordersRes, escrowsRes, productsRes] = await Promise.all([
     apiGet<PaginatedResponse<Order>>(`/orders/${deriveStoreId(walletAddress)}?limit=5`, walletAddress),
     apiGet<PaginatedResponse<Escrow>>(`/escrow/store/${deriveStoreId(walletAddress)}?limit=5`, walletAddress),
@@ -62,6 +73,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const activeProducts = products.filter((p) => p.status === "published").length;
 
   return json({
+    walletAddress,
     orders,
     escrows,
     orderSummary,
@@ -75,6 +87,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function Dashboard() {
   const {
+    walletAddress,
     escrows,
     orderSummary,
     totalOrders,
@@ -82,6 +95,10 @@ export default function Dashboard() {
     totalRevenue,
     error,
   } = useLoaderData<typeof loader>();
+
+  const truncatedWallet = walletAddress
+    ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`
+    : "Not connected";
 
   return (
     <AnimatedPage>
@@ -110,10 +127,10 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3 pt-2">
             <code className="font-mono text-white/60 bg-black/20 px-3 py-1 rounded-lg text-sm">
-              GDRX...7F9K
+              {truncatedWallet}
             </code>
             <span className="bg-cyan-500/20 text-cyan-200 text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border border-cyan-500/30">
-              Stellar Testnet
+              Stellar Mainnet
             </span>
           </div>
         </div>
@@ -127,7 +144,7 @@ export default function Dashboard() {
             Create Product
           </LinkButton>
           <a
-            href="https://stellar.expert/explorer/testnet/account/GDRX7F9K"
+            href={`https://stellar.expert/explorer/public/account/${walletAddress || ""}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-xs text-cyan-200/70 hover:text-cyan-100 transition-colors"

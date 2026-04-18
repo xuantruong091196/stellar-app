@@ -80,6 +80,7 @@ export default function App() {
     path === "/terms" ||
     path === "/refund-policy" ||
     path === "/provider-onboarding" ||
+    path === "/onboarding" ||
     path === "/provider" ||
     path.startsWith("/provider/");
 
