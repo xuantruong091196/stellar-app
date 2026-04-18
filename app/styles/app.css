@@ -83,3 +83,43 @@ html {
 }
 
 /* Shopify polaris Frame override removed — we use custom layout */
+
+/* Glass card — updated for redesign */
+.glass-card {
+  background: rgba(26, 27, 32, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 1.25rem;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.glass-card:hover {
+  border-color: rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.08);
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 0.625rem;
+}
+
+/* Ambient gradient pulse */
+@keyframes ambient-pulse {
+  0%, 100% { opacity: 0.12; filter: hue-rotate(0deg); }
+  50% { opacity: 0.18; filter: hue-rotate(30deg); }
+}
+.ambient-gradient {
+  animation: ambient-pulse 8s ease-in-out infinite;
+}
+
+/* Updated text contrast */
+.text-on-surface-bright {
+  color: #f0f0f5;
+}

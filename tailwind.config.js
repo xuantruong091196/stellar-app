@@ -59,13 +59,15 @@ export default {
       },
       borderRadius: {
         DEFAULT: "0.625rem",
-        lg: "0.5rem",
-        xl: "0.75rem",
+        lg: "0.75rem",
+        xl: "1rem",
+        "2xl": "1.25rem",
+        "3xl": "1.5rem",
         full: "9999px",
       },
       fontFamily: {
         headline: ['"Space Grotesk"', "sans-serif"],
-        body: ['"Space Grotesk"', "sans-serif"],
+        body: ["Inter", '"Space Grotesk"', "sans-serif"],
         label: ["Inter", "sans-serif"],
         mono: ['"JetBrains Mono"', "monospace"],
       },
