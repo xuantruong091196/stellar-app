@@ -139,9 +139,9 @@ export function DesignEditor({
     if (!el) return;
     const update = () => {
       const rect = el.getBoundingClientRect();
-      const available = rect.width - 16;
-      const s = Math.min(1, available / 800);
-      setCssScale(s);
+      const sw = (rect.width - 16) / 800;
+      const sh = (rect.height - 16) / 1000;
+      setCssScale(Math.min(1, sw, sh));
     };
     update();
     const ro = new ResizeObserver(update);
@@ -435,7 +435,7 @@ export function DesignEditor({
               transform: `scale(${cssScale})`,
               transformOrigin: "top center",
               width: 800,
-              height: 700,
+              height: 1000,
               flexShrink: 0,
             }}
             className={isReady ? "" : "hidden"}

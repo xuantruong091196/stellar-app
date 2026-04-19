@@ -40,9 +40,10 @@ interface UseFabricCanvasOptions {
   initialLayers?: object | null;
 }
 
-// Fixed logical canvas size — visual scaling handled via CSS transform
+// Fixed logical canvas size — visual scaling handled via CSS transform.
+// 4:5 portrait ratio suits model/lifestyle product photos.
 const CANVAS_W = 800;
-const CANVAS_H = 700;
+const CANVAS_H = 1000;
 
 function computePrintArea(
   printArea: { name: string; widthPx: number; heightPx: number; dpi: number },
@@ -131,9 +132,15 @@ export function useFabricCanvas(options: UseFabricCanvasOptions) {
               evented: false,
               name: "__blank",
             });
-            img.scaleToWidth(CANVAS_W);
-            const imgHeight = img.getScaledHeight();
-            img.set({ top: (CANVAS_H - imgHeight) / 2 });
+            const scaleW = CANVAS_W / (img.width || 1);
+            const scaleH = CANVAS_H / (img.height || 1);
+            const fitScale = Math.min(scaleW, scaleH);
+            img.set({
+              scaleX: fitScale,
+              scaleY: fitScale,
+              left: (CANVAS_W - (img.width || 0) * fitScale) / 2,
+              top: (CANVAS_H - (img.height || 0) * fitScale) / 2,
+            });
             img.setCoords();
             c.add(img);
             c.sendObjectToBack(img);

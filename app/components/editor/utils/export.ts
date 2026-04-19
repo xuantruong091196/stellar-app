@@ -42,10 +42,26 @@ export function exportAtPrintDPI(
 
 /**
  * Export the FULL canvas (blank product + design overlaid) as a JPEG.
- * Used for Shopify product listing images — WYSIWYG, what the merchant
- * sees in the editor is what appears on the storefront.
+ * Crops to the blank product image bounds so there are no dark bars.
+ * Used for Shopify product listing images — WYSIWYG.
  */
 export function exportFullCanvas(canvas: FabricCanvas): string {
+  const blank = canvas.getObjects().find((o) => (o as any).name === "__blank");
+  if (blank) {
+    const left = blank.left ?? 0;
+    const top = blank.top ?? 0;
+    const w = blank.getScaledWidth();
+    const h = blank.getScaledHeight();
+    return canvas.toDataURL({
+      format: "jpeg",
+      quality: 0.92,
+      multiplier: 2,
+      left,
+      top,
+      width: w,
+      height: h,
+    });
+  }
   return canvas.toDataURL({
     format: "jpeg",
     quality: 0.92,
