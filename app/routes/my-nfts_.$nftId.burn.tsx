@@ -8,7 +8,7 @@ import { useActionData, useLoaderData, useNavigation, useParams } from "@remix-r
 import { pageMeta } from "~/lib/seo";
 import { AnimatedPage } from "~/components/ui/AnimatedPage";
 
-const API = process.env.STELLARPOD_API_URL || "http://localhost:4000";
+const API = process.env.STELLARPOD_API_URL || "http://localhost:8000";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -38,7 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return redirect("/my-nfts");
   }
 
-  const { jwt } = (await verifyRes.json()) as { jwt: string };
+  const { accessToken: jwt } = (await verifyRes.json()) as { accessToken: string };
 
   return json({ jwt, token });
 }
@@ -53,7 +53,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return json({ error: "Missing authentication. Please go back and try again." }, { status: 400 });
   }
 
-  const shippingAddress = {
+  const shipping = {
     name: formData.get("name") as string,
     street: formData.get("street") as string,
     city: formData.get("city") as string,
@@ -63,7 +63,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   };
 
   // Validate required fields
-  const missing = Object.entries(shippingAddress)
+  const missing = Object.entries(shipping)
     .filter(([, v]) => !v || !v.trim())
     .map(([k]) => k);
 
@@ -77,7 +77,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       "Content-Type": "application/json",
       Authorization: `Bearer ${jwt}`,
     },
-    body: JSON.stringify({ shippingAddress }),
+    body: JSON.stringify(shipping),
   });
 
   if (!res.ok) {

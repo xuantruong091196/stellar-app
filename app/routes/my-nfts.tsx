@@ -9,7 +9,7 @@ import { pageMeta } from "~/lib/seo";
 import { AnimatedPage } from "~/components/ui/AnimatedPage";
 import { NftCard } from "~/components/nft/NftCard";
 
-const API = process.env.STELLARPOD_API_URL || "http://localhost:4000";
+const API = process.env.STELLARPOD_API_URL || "http://localhost:8000";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -52,10 +52,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return json({ authenticated: false as const, nfts: [] as NftItem[], error: "Invalid or expired link. Please request a new one.", burned: false });
   }
 
-  const { jwt } = (await verifyRes.json()) as { jwt: string };
+  const { accessToken: jwt } = (await verifyRes.json()) as { accessToken: string };
 
   // Fetch buyer's NFTs
-  const nftsRes = await fetch(`${API}/buyer/nfts`, {
+  const nftsRes = await fetch(`${API}/buyer/my-nfts`, {
     headers: { Authorization: `Bearer ${jwt}` },
   });
 
