@@ -25,6 +25,7 @@ import { pageMeta } from "~/lib/seo";
 import { AnimatedPage } from "~/components/ui/AnimatedPage";
 import { StaggerList, StaggerItem } from "~/components/ui/StaggerList";
 import { EmptyState as AnimatedEmptyState } from "~/components/ui/EmptyState";
+import { useConfirm } from "~/components/ui/ConfirmModal";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -94,6 +95,7 @@ export default function Products() {
     useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
   const fetcher = useFetcher<{ error?: string }>();
+  const { confirm: confirmDialog } = useConfirm();
 
   const currentStatus = searchParams.get("status") || "";
   const selectedTab =
@@ -261,21 +263,24 @@ export default function Products() {
                               </button>
                             </fetcher.Form>
                           )}
-                          <fetcher.Form method="post">
-                            <input
-                              type="hidden"
-                              name="intent"
-                              value="delete"
-                            />
-                            <input
-                              type="hidden"
-                              name="productId"
-                              value={p.id}
-                            />
-                            <button className="text-xs font-bold text-red-400 hover:underline">
-                              Delete
-                            </button>
-                          </fetcher.Form>
+                          <button
+                            className="text-xs font-bold text-red-400 hover:underline"
+                            onClick={async () => {
+                              const ok = await confirmDialog({
+                                title: "Delete Product",
+                                message: `Delete "${p.title}" permanently? This cannot be undone.`,
+                                confirmLabel: "Delete",
+                                variant: "danger",
+                              });
+                              if (!ok) return;
+                              const fd = new FormData();
+                              fd.set("intent", "delete");
+                              fd.set("productId", p.id);
+                              fetcher.submit(fd, { method: "post" });
+                            }}
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>

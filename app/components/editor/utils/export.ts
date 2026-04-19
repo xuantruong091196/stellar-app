@@ -5,7 +5,7 @@ const MAX_EXPORT_PIXELS = 200_000_000; // ~14142x14142, well under 268M browser 
 
 /**
  * Export the canvas content within the print area at full print resolution.
- * Returns a base64 PNG data URL.
+ * Returns a base64 PNG data URL. Used for print-production files.
  */
 export function exportAtPrintDPI(
   canvas: FabricCanvas,
@@ -37,5 +37,18 @@ export function exportAtPrintDPI(
     top: printArea.y,
     width: printArea.displayWidth,
     height: printArea.displayHeight,
+  });
+}
+
+/**
+ * Export the FULL canvas (blank product + design overlaid) as a JPEG.
+ * Used for Shopify product listing images — WYSIWYG, what the merchant
+ * sees in the editor is what appears on the storefront.
+ */
+export function exportFullCanvas(canvas: FabricCanvas): string {
+  return canvas.toDataURL({
+    format: "jpeg",
+    quality: 0.92,
+    multiplier: 2,
   });
 }

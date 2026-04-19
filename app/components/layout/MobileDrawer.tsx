@@ -97,7 +97,7 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
             {/* Version footer */}
             <div className="px-5 pb-6 flex-shrink-0">
               <span className="text-[10px] font-mono text-white/20 select-none">
-                v1.0 • Testnet
+                v1.0 • Mainnet
               </span>
             </div>
           </motion.aside>

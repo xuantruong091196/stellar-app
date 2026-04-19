@@ -171,8 +171,9 @@ export default function Onboarding() {
   }, [fetcher]);
 
   const handleComplete = useCallback(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("stelo_onboarding_complete", "true");
+    if (typeof document !== "undefined") {
+      const secure = location.protocol === "https:" ? "; Secure" : "";
+      document.cookie = `stelo_onboarding_complete=true; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax${secure}`;
     }
     navigate("/dashboard");
   }, [navigate]);

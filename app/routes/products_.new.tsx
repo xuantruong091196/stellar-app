@@ -80,6 +80,8 @@ export async function action({ request }: ActionFunctionArgs) {
       rotation: parseFloat((formData.get("printConfigRotation") as string) || "0"),
     };
 
+    const mockupDataUrl = formData.get("mockupDataUrl") as string | null;
+
     const result = await apiPost<MerchantProduct>(
       `/products/${deriveStoreId(walletAddress)}`,
       {
@@ -88,6 +90,7 @@ export async function action({ request }: ActionFunctionArgs) {
         title,
         retailPrice,
         printConfig,
+        ...(mockupDataUrl ? { mockupDataUrl } : {}),
       },
       walletAddress,
     );
@@ -155,6 +158,7 @@ export default function CreateProduct() {
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
   const [editorLayers, setEditorLayers] = useState<object | null>(null);
   const [editorExportUrl, setEditorExportUrl] = useState<string | null>(null);
+  const [editorMockupUrl, setEditorMockupUrl] = useState<string | null>(null);
   const [editorPrintConfig, setEditorPrintConfig] = useState<PrintConfig | null>(null);
   const [targetMargin, setTargetMargin] = useState(30);
 
@@ -615,6 +619,7 @@ export default function CreateProduct() {
             onSave={(data) => {
               setEditorLayers(data.layers);
               setEditorExportUrl(data.exportDataUrl);
+              setEditorMockupUrl(data.mockupDataUrl);
               setSelectedPrintArea(data.printArea);
               setEditorPrintConfig(data.printConfig);
             }}
@@ -795,17 +800,30 @@ export default function CreateProduct() {
                 name="printConfigRotation"
                 value={editorPrintConfig?.rotation ?? 0}
               />
+              {editorMockupUrl && (
+                <input
+                  type="hidden"
+                  name="mockupDataUrl"
+                  value={editorMockupUrl}
+                />
+              )}
               <Button
                 type="submit"
                 disabled={
                   !title ||
                   !retailPrice ||
                   parseFloat(retailPrice) <= 0 ||
+                  !editorMockupUrl ||
                   isSubmitting
                 }
               >
                 {isSubmitting ? "Creating..." : "Create Draft"}
               </Button>
+              {!editorMockupUrl && (
+                <p className="text-xs text-amber-400 mt-2">
+                  Save your design first (click Save in the editor or press Ctrl+S)
+                </p>
+              )}
             </fetcher.Form>
           </div>
         </div>

@@ -143,7 +143,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
               transition={{ duration: 0.15 }}
               className="text-[10px] font-mono text-white/20 mb-1 select-none"
             >
-              v1.0 • Testnet
+              v1.0 • Mainnet
             </motion.span>
           )}
         </AnimatePresence>

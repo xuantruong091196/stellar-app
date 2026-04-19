@@ -32,12 +32,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const walletAddress = await requireUser(request);
   const storeId = deriveStoreId(walletAddress);
 
-  // Check if the merchant needs onboarding — a wallet-only stub store
-  // (domain ends with .stelo.life) means Shopify hasn't been connected yet.
-  const storeRes = await apiGet<Store>(`/stores/${storeId}`, walletAddress);
-  const shopifyDomain = storeRes.data?.shopifyDomain ?? "";
-  if (!shopifyDomain || shopifyDomain.endsWith(".stelo.life")) {
-    throw redirect("/onboarding");
+  // Check if the merchant needs onboarding.
+  // Skip if the merchant already dismissed onboarding (cookie).
+  const cookies = request.headers.get("Cookie") || "";
+  const onboardingDone = cookies.includes("stelo_onboarding_complete=true");
+  if (!onboardingDone) {
+    // Quick check: try fetching products. If the API resolves the wallet
+    // to a real Shopify store, it works. If it returns an error or the
+    // store is still a wallet-only stub, redirect to onboarding.
+    const checkRes = await apiGet<{ data: unknown[] }>(
+      `/products/store/${storeId}?limit=1`,
+      walletAddress,
+    );
+    if (checkRes.error && checkRes.status === 401) {
+      throw redirect("/onboarding");
+    }
   }
 
   const [ordersRes, escrowsRes, productsRes] = await Promise.all([

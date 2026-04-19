@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useFabricCanvas } from "./hooks/useFabricCanvas";
 import { useHistory } from "./hooks/useHistory";
 import { useGoogleFonts } from "./hooks/useGoogleFonts";
-import { exportAtPrintDPI } from "./utils/export";
+import { exportAtPrintDPI, exportFullCanvas } from "./utils/export";
 import { IconToolbar } from "./IconToolbar";
 import type { PanelTab } from "./IconToolbar";
 import { ExpandablePanel } from "./ExpandablePanel";
@@ -39,6 +39,7 @@ interface DesignEditorProps {
     printArea: string;
     layers: object;
     exportDataUrl: string;
+    mockupDataUrl: string;
     printConfig: PrintConfigResult;
   }) => void;
   isSaving?: boolean;
@@ -187,13 +188,15 @@ export function DesignEditor({
     try {
       const layers = (canvas as any).toJSON(["name", "selectable", "evented"]);
       let exportDataUrl = "";
+      let mockupDataUrl = "";
       try {
         exportDataUrl = exportAtPrintDPI(canvas, displayPrintArea);
+        mockupDataUrl = exportFullCanvas(canvas);
       } catch {
         console.warn("Export failed (tainted canvas), saving layers only");
       }
       const printConfig = computePrintConfig(canvas, displayPrintArea, activePrintArea);
-      onSave({ printArea: activePrintArea, layers, exportDataUrl, printConfig });
+      onSave({ printArea: activePrintArea, layers, exportDataUrl, mockupDataUrl, printConfig });
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (err) {

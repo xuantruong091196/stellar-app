@@ -461,7 +461,7 @@ function ProvidersTab({
                   </div>
                   <div className="bg-surface-container-high p-2 rounded-xl">
                     <p className="font-mono font-bold text-xs">
-                      {p.completionRate}%
+                      {Math.round(p.completionRate * 100)}%
                     </p>
                     <p className="text-[10px] text-on-surface-variant uppercase">
                       Rate
@@ -477,7 +477,7 @@ function ProvidersTab({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-1 flex-1">
+                <div className="flex flex-wrap gap-1.5">
                   {p.specialties.slice(0, 3).map((s) => (
                     <Pill key={s} tone="indigo">
                       {s}
@@ -485,7 +485,7 @@ function ProvidersTab({
                   ))}
                 </div>
 
-                <div className="pt-2 mt-auto">
+                <div className="pt-2 mt-auto flex-shrink-0">
                   <button
                     onClick={() => onConnect(p.id)}
                     className={
@@ -743,9 +743,10 @@ function BlankDetailModal({
                 </p>
               )}
               {blank.description && (
-                <p className="text-sm text-on-surface-variant">
-                  {blank.description}
-                </p>
+                <div
+                  className="text-sm text-on-surface-variant [&_ul]:list-disc [&_ul]:pl-4 [&_li]:text-on-surface-variant [&_p]:mb-2 [&_span.wysiwyg]:contents"
+                  dangerouslySetInnerHTML={{ __html: blank.description }}
+                />
               )}
             </div>
           </div>

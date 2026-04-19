@@ -7,9 +7,9 @@ const variants = {
   exit: { opacity: 0, transition: { duration: 0.2 } },
 } as const;
 
-export function AnimatedPage({ children }: { children: ReactNode }) {
+export function AnimatedPage({ children, className = "space-y-8" }: { children: ReactNode; className?: string }) {
   return (
-    <motion.div variants={variants} initial="initial" animate="animate" exit="exit">
+    <motion.div variants={variants} initial="initial" animate="animate" exit="exit" className={className}>
       {children}
     </motion.div>
   );

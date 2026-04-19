@@ -4,13 +4,15 @@ import type {
   ActionFunctionArgs,
   MetaFunction,
 } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useLoaderData, useNavigate, useFetcher, Link } from "@remix-run/react";
+import { json, redirect } from "@remix-run/node";
+import { useLoaderData, useFetcher, Link } from "@remix-run/react";
+
 import { apiGet, apiPost, apiDelete } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type { MerchantProduct } from "~/lib/types";
 import { pageMeta } from "~/lib/seo";
 import { AnimatedPage } from "~/components/ui/AnimatedPage";
+import { useConfirm } from "~/components/ui/ConfirmModal";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -55,25 +57,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   if (intent === "delete") {
     const r = await apiDelete(`/products/${productId}`, walletAddress);
-    return r.error
-      ? json({ error: r.error }, { status: r.status || 500 })
-      : json({ success: true, deleted: true });
+    if (r.error) return json({ error: r.error }, { status: r.status || 500 });
+    return redirect("/products");
   }
   return json({ error: "Unknown intent" }, { status: 400 });
 }
 
 export default function ProductDetail() {
-  const navigate = useNavigate();
   const { product, error } = useLoaderData<typeof loader>();
-  const fetcher = useFetcher<{
-    error?: string;
-    deleted?: boolean;
-  }>();
+  const fetcher = useFetcher<{ error?: string }>();
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState<number>(0);
 
   const isSubmitting = fetcher.state === "submitting";
+  const { confirm: confirmDialog } = useConfirm();
 
   // All hooks must run before any conditional returns
   const providerProduct = product?.providerProduct;
@@ -133,11 +131,6 @@ export default function ProductDetail() {
     if (!productType) return false;
     return !product.design.mockups.some((m) => m.productType === productType);
   }, [product, providerProduct]);
-
-  if (fetcher.data?.deleted) {
-    navigate("/products");
-    return null;
-  }
 
   if (error || !product) {
     return (
@@ -254,22 +247,25 @@ export default function ProductDetail() {
               </button>
             </fetcher.Form>
           )}
-          <fetcher.Form method="post">
-            <input type="hidden" name="intent" value="delete" />
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              onClick={(e) => {
-                if (!confirm("Delete this product permanently?")) {
-                  e.preventDefault();
-                }
-              }}
-              className="w-11 h-11 rounded-full bg-surface-container-high hover:bg-red-500/20 text-on-surface-variant hover:text-red-400 flex items-center justify-center transition-colors"
-              aria-label="Delete product"
-            >
-              <span className="material-symbols-outlined text-base">delete</span>
-            </button>
-          </fetcher.Form>
+          <button
+            disabled={isSubmitting}
+            onClick={async () => {
+              const ok = await confirmDialog({
+                title: "Delete Product",
+                message: "Delete this product permanently? This cannot be undone.",
+                confirmLabel: "Delete",
+                variant: "danger",
+              });
+              if (!ok) return;
+              const fd = new FormData();
+              fd.set("intent", "delete");
+              fetcher.submit(fd, { method: "post" });
+            }}
+            className="w-11 h-11 rounded-full bg-surface-container-high hover:bg-red-500/20 text-on-surface-variant hover:text-red-400 flex items-center justify-center transition-colors"
+            aria-label="Delete product"
+          >
+            <span className="material-symbols-outlined text-base">delete</span>
+          </button>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import type { Escrow, EscrowStatus } from "~/lib/types";
 
-const STELLAR_EXPLORER = "https://stellar.expert/explorer/testnet";
+const STELLAR_EXPLORER = "https://stellar.expert/explorer/public";
 
 interface TimelineStep {
   key: string;
