@@ -82,6 +82,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const mockupDataUrl = formData.get("mockupDataUrl") as string | null;
 
+    const isBurnToClaim = formData.get("isBurnToClaim") === "true";
+    const maxSupplyStr = formData.get("maxSupply") as string | null;
+    const maxSupply = maxSupplyStr ? parseInt(maxSupplyStr, 10) : null;
+
     const result = await apiPost<MerchantProduct>(
       `/products/${deriveStoreId(walletAddress)}`,
       {
@@ -91,6 +95,8 @@ export async function action({ request }: ActionFunctionArgs) {
         retailPrice,
         printConfig,
         ...(mockupDataUrl ? { mockupDataUrl } : {}),
+        ...(isBurnToClaim ? { isBurnToClaim: true } : {}),
+        ...(maxSupply ? { maxSupply } : {}),
       },
       walletAddress,
     );
@@ -671,6 +677,35 @@ export default function CreateProduct() {
                   className="ghost-input font-mono text-lg"
                   inputMode="decimal"
                 />
+              </div>
+
+              {/* Burn-to-Claim Toggle */}
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="isBurnToClaim"
+                    value="true"
+                    className="w-4 h-4 rounded border-outline-variant accent-primary"
+                  />
+                  <div>
+                    <span className="text-sm font-bold">Limited Edition — Burn to Claim</span>
+                    <p className="text-xs text-on-surface-variant">Buyers get an NFT first, then burn it to receive the physical product</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Max Supply */}
+              <div>
+                <label className="text-xs font-bold text-on-surface-variant uppercase">Max Supply</label>
+                <input
+                  type="number"
+                  name="maxSupply"
+                  min="1"
+                  placeholder="e.g. 50"
+                  className="w-full mt-1 px-4 py-3 rounded-xl bg-surface-container-high border border-outline-variant/10 text-sm"
+                />
+                <p className="text-xs text-on-surface-variant mt-1">Leave empty for unlimited</p>
               </div>
             </section>
 

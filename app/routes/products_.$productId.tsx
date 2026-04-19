@@ -622,6 +622,25 @@ export default function ProductDetail() {
               </span>
             </div>
           </section>
+
+          {/* NFT Info */}
+          {product.isBurnToClaim && (
+            <section className="bg-surface-container-low rounded-xl p-6">
+              <h2 className="font-headline font-bold text-lg mb-4">Digital Twin NFT</h2>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-on-surface-variant">Type</span>
+                  <span className="font-bold text-amber-400">Burn to Claim</span>
+                </div>
+                {product.maxSupply && (
+                  <div className="flex justify-between">
+                    <span className="text-on-surface-variant">Supply</span>
+                    <span className="font-bold">{product.maxSupply} max</span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
         </div>
       </div>
 
