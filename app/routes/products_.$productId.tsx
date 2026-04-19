@@ -103,25 +103,23 @@ export default function ProductDetail() {
 
     const productType = providerProduct?.productType;
     const mockups = product.design?.mockups || [];
-    const result: { url: string; label: string }[] = [];
 
-    // 1. Editor-export mockup first (WYSIWYG) — try exact productType, then any
-    const editorExport =
-      mockups.find((m) => m.variant === "editor-export" && m.productType === productType) ||
-      mockups.find((m) => m.variant === "editor-export");
-    if (editorExport) {
-      result.push({ url: editorExport.imageUrl, label: "Preview" });
+    // Only show mockups that match THIS product's providerProduct type.
+    // A design can be used across multiple products (t-shirt, mug, hoodie)
+    // so we must not mix mockups from different product types.
+    const mine = mockups.filter((m) => m.productType === productType);
+    if (mine.length > 0) {
+      const editorFirst = [
+        ...mine.filter((m) => m.variant === "editor-export"),
+        ...mine.filter((m) => m.variant !== "editor-export"),
+      ];
+      return editorFirst.map((m) => ({
+        url: m.imageUrl,
+        label: m.variant === "editor-export" ? "Preview" : m.variant,
+      }));
     }
 
-    // 2. Other composite mockups matching productType
-    const composites = mockups.filter(
-      (m) => m.productType === productType && m.variant !== "editor-export",
-    );
-    composites.forEach((m) => result.push({ url: m.imageUrl, label: m.variant }));
-
-    if (result.length > 0) return result;
-
-    // 3. Fallback: blank product images
+    // Fallback: blank product images
     const blankImages = providerProduct?.blankImages || {};
     return Object.entries(blankImages).map(([color, url]) => ({
       url: url as string,
@@ -638,7 +636,7 @@ export default function ProductDetail() {
                 <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
                   {spec.label}
                 </p>
-                <p className="text-sm font-medium">{spec.value}</p>
+                <p className="text-sm font-medium">{typeof spec.value === "string" ? spec.value.replace(/<[^>]*>/g, "") : spec.value}</p>
               </div>
             ))}
           </div>
