@@ -241,6 +241,70 @@ export default function IndexPage() {
             </div>
           </div>
         </section>
+
+        {/* Digital Twin Section */}
+        <section className="py-24 px-6">
+          <div className="max-w-6xl mx-auto text-center space-y-6">
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-wider">
+              Digital Twin NFT
+            </span>
+            <h2 className="text-4xl md:text-5xl font-bold font-headline tracking-tighter">
+              Every Product Comes With Its Digital Twin
+            </h2>
+            <p className="text-on-surface-variant max-w-2xl mx-auto">
+              Buy a product. Own its NFT. Verify authenticity on the Stellar blockchain. Trade freely.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8">
+              {[
+                { icon: "shopping_bag", title: "Buy", desc: "Shop on Shopify as usual" },
+                { icon: "token", title: "Own", desc: "NFT auto-minted to your wallet" },
+                { icon: "qr_code_scanner", title: "Verify", desc: "Scan QR on product = blockchain proof" },
+              ].map((step) => (
+                <div key={step.title} className="bg-surface-container-low rounded-2xl p-8 border border-outline-variant/10 space-y-3">
+                  <span className="material-symbols-outlined text-3xl text-primary">{step.icon}</span>
+                  <h3 className="text-lg font-bold font-headline">{step.title}</h3>
+                  <p className="text-sm text-on-surface-variant">{step.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Burn to Claim Section */}
+        <section className="py-24 px-6 bg-surface-container-low/50">
+          <div className="max-w-4xl mx-auto text-center space-y-6">
+            <span className="material-symbols-outlined text-5xl text-amber-400">local_fire_department</span>
+            <h2 className="text-3xl md:text-4xl font-bold font-headline tracking-tighter">Exclusive Drops</h2>
+            <p className="text-on-surface-variant max-w-xl mx-auto">
+              Buy the NFT first. Burn it when you're ready to receive the physical product. Limited editions, true scarcity.
+            </p>
+          </div>
+        </section>
+
+        {/* Community Section */}
+        <section className="py-24 px-6">
+          <div className="max-w-4xl mx-auto text-center space-y-6">
+            <h2 className="text-3xl md:text-4xl font-bold font-headline tracking-tighter">Own a Piece of the Platform</h2>
+            <p className="text-on-surface-variant max-w-xl mx-auto">
+              NFT holders are more than customers — they're community members.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+              {[
+                { icon: "lock", title: "Token-Gated Collections", badge: "Coming Soon" },
+                { icon: "how_to_vote", title: "Vote on Designs", badge: "Coming Soon" },
+                { icon: "payments", title: "Designer Royalties", badge: "Coming Soon" },
+              ].map((item) => (
+                <div key={item.title} className="bg-surface-container-low rounded-xl p-6 border border-outline-variant/10 text-center space-y-2">
+                  <span className="material-symbols-outlined text-2xl text-secondary">{item.icon}</span>
+                  <h3 className="text-sm font-bold">{item.title}</h3>
+                  <span className="inline-block text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    {item.badge}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* Footer */}
