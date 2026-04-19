@@ -83,7 +83,9 @@ export default function App() {
     path === "/provider-onboarding" ||
     path === "/onboarding" ||
     path === "/provider" ||
-    path.startsWith("/provider/");
+    path.startsWith("/provider/") ||
+    path.startsWith("/verify/") ||
+    path.startsWith("/my-nfts");
 
   return (
     <html lang="en" className="dark">
