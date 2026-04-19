@@ -101,28 +101,32 @@ export default function ProductDetail() {
   const images = useMemo(() => {
     if (!product) return [];
 
-    // Prefer composite mockups (design already placed on product)
     const productType = providerProduct?.productType;
     const mockups = product.design?.mockups || [];
-    const matching = productType
-      ? mockups.filter((m) => m.productType === productType)
-      : mockups;
+    const result: { url: string; label: string }[] = [];
 
-    if (matching.length > 0) {
-      return matching.map((m) => ({
-        url: m.imageUrl,
-        label: m.variant,
-      }));
+    // 1. Editor-export mockup first (WYSIWYG) — try exact productType, then any
+    const editorExport =
+      mockups.find((m) => m.variant === "editor-export" && m.productType === productType) ||
+      mockups.find((m) => m.variant === "editor-export");
+    if (editorExport) {
+      result.push({ url: editorExport.imageUrl, label: "Preview" });
     }
 
-    // Fallback: blank product images + design thumbnail
-    // (only shown while mockups are being generated in background)
+    // 2. Other composite mockups matching productType
+    const composites = mockups.filter(
+      (m) => m.productType === productType && m.variant !== "editor-export",
+    );
+    composites.forEach((m) => result.push({ url: m.imageUrl, label: m.variant }));
+
+    if (result.length > 0) return result;
+
+    // 3. Fallback: blank product images
     const blankImages = providerProduct?.blankImages || {};
-    const blankImgList = Object.entries(blankImages).map(([color, url]) => ({
+    return Object.entries(blankImages).map(([color, url]) => ({
       url: url as string,
       label: color,
     }));
-    return blankImgList;
   }, [product, providerProduct]);
 
   const isMockupPending = useMemo(() => {
