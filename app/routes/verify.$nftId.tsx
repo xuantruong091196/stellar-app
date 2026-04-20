@@ -7,27 +7,23 @@ import { VerificationBadge } from "~/components/nft/VerificationBadge";
 import { PhysicalTimeline } from "~/components/nft/PhysicalTimeline";
 
 interface NftVerification {
-  nftId: string;
-  status: string;
-  assetCode?: string;
-  assetIssuer?: string;
-  owner?: string;
-  productTitle?: string;
-  productImage?: string;
-  merchantName?: string;
-  mintedAt?: string;
-  timeline?: Array<{ event: string; date: string; txHash?: string }>;
+  product: { title: string; mockupUrl: string; designer: string };
+  nft: { assetCode: string; serial: number; status: string; edition: string | null };
+  physical: { status: string } | null;
+  stellar: { mintTxHash: string | null; explorerUrl: string | null };
+  owner: { maskedAddress: string | null };
+  timeline: Array<{ event: string; date: string; txHash?: string }>;
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
   const title = data?.nft
-    ? `Verify: ${data.nft.productTitle || data.nft.assetCode || data.nft.nftId}`
+    ? `Verify: ${data.nft.product.title || data.nft.nft.assetCode}`
     : "NFT Verification";
   return pageMeta({
     title,
     description:
       "Verify the authenticity of a Stelo NFT-tagged physical product on the Stellar blockchain.",
-    path: `/verify/${data?.nft?.nftId || ""}`,
+    path: `/verify/${data?.nftId || ""}`,
   });
 };
 
@@ -57,7 +53,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
       );
     }
     const nft = (await res.json()) as NftVerification;
-    return json({ nft, error: null });
+    return json({ nft, nftId, error: null });
   } catch (err) {
     return json(
       {
@@ -104,25 +100,25 @@ export default function VerifyNft() {
             <div className="space-y-8">
               {/* Badge + Title */}
               <div className="text-center space-y-4">
-                <VerificationBadge status={nft.status} />
-                {nft.productTitle && (
+                <VerificationBadge status={nft.nft.status} />
+                {nft.product.title && (
                   <h1 className="text-3xl md:text-4xl font-headline font-bold tracking-tight">
-                    {nft.productTitle}
+                    {nft.product.title}
                   </h1>
                 )}
-                {nft.merchantName && (
+                {nft.product.designer && (
                   <p className="text-on-surface-variant text-sm">
-                    by <span className="font-bold text-on-surface">{nft.merchantName}</span>
+                    by <span className="font-bold text-on-surface">{nft.product.designer}</span>
                   </p>
                 )}
               </div>
 
               {/* Product image */}
-              {nft.productImage && (
+              {nft.product.mockupUrl && (
                 <div className="bg-surface-container-low rounded-xl overflow-hidden aspect-[4/3] flex items-center justify-center">
                   <img
-                    src={nft.productImage}
-                    alt={nft.productTitle || "Product"}
+                    src={nft.product.mockupUrl}
+                    alt={nft.product.title || "Product"}
                     className="w-full h-full object-contain p-8"
                   />
                 </div>
@@ -134,60 +130,51 @@ export default function VerifyNft() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold mb-1">
-                      NFT ID
+                      Asset Code
                     </p>
-                    <p className="font-mono text-xs break-all">{nft.nftId}</p>
+                    <p className="font-mono text-xs">{nft.nft.assetCode}</p>
                   </div>
-                  {nft.assetCode && (
+                  {nft.nft.edition && (
                     <div>
                       <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold mb-1">
-                        Asset Code
+                        Edition
                       </p>
-                      <p className="font-mono text-xs">{nft.assetCode}</p>
+                      <p className="font-mono text-xs">{nft.nft.edition}</p>
                     </div>
                   )}
-                  {nft.assetIssuer && (
-                    <div className="sm:col-span-2">
-                      <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold mb-1">
-                        Issuer
-                      </p>
-                      <a
-                        href={`https://stellar.expert/explorer/public/account/${nft.assetIssuer}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-mono text-xs text-primary hover:underline break-all"
-                      >
-                        {nft.assetIssuer}
-                      </a>
-                    </div>
-                  )}
-                  {nft.owner && (
-                    <div className="sm:col-span-2">
+                  {nft.owner.maskedAddress && (
+                    <div>
                       <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold mb-1">
                         Current Owner
                       </p>
-                      <a
-                        href={`https://stellar.expert/explorer/public/account/${nft.owner}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-mono text-xs text-primary hover:underline break-all"
-                      >
-                        {nft.owner}
-                      </a>
+                      <p className="font-mono text-xs">{nft.owner.maskedAddress}</p>
                     </div>
                   )}
-                  {nft.mintedAt && (
+                  {nft.physical && (
                     <div>
                       <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold mb-1">
-                        Minted
+                        Physical Status
                       </p>
-                      <p className="text-xs">
-                        {new Date(nft.mintedAt).toLocaleDateString("en-US", {
-                          month: "long",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
+                      <p className="text-xs">{nft.physical.status}</p>
+                    </div>
+                  )}
+                  {nft.stellar.mintTxHash && (
+                    <div className="sm:col-span-2">
+                      <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold mb-1">
+                        Mint Transaction
                       </p>
+                      {nft.stellar.explorerUrl ? (
+                        <a
+                          href={nft.stellar.explorerUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-xs text-primary hover:underline break-all"
+                        >
+                          {nft.stellar.mintTxHash}
+                        </a>
+                      ) : (
+                        <p className="font-mono text-xs break-all">{nft.stellar.mintTxHash}</p>
+                      )}
                     </div>
                   )}
                 </div>

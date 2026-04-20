@@ -62,9 +62,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     country: formData.get("country") as string,
   };
 
-  // Validate required fields
+  // Validate required fields (state is optional — many countries don't have states/provinces)
   const missing = Object.entries(shipping)
-    .filter(([, v]) => !v || !v.trim())
+    .filter(([k, v]) => k !== 'state' && (!v || !v.trim()))
     .map(([k]) => k);
 
   if (missing.length > 0) {
@@ -176,7 +176,6 @@ export default function BurnToClaim() {
                 type="text"
                 id="state"
                 name="state"
-                required
                 placeholder="CA"
                 className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/20 rounded-xl text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary transition-colors"
               />
