@@ -111,10 +111,10 @@ export default function MyNfts() {
               </div>
             )}
 
-            {"error" in data && data.error && (
+            {"error" in data && (data as any).error && (
               <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-6 py-4 rounded-2xl">
                 <p className="text-sm font-bold">Authentication error</p>
-                <p className="text-xs opacity-80">{data.error as string}</p>
+                <p className="text-xs opacity-80">{String((data as any).error)}</p>
               </div>
             )}
 
@@ -149,9 +149,9 @@ export default function MyNfts() {
           </p>
         </div>
 
-        {"error" in data && data.error && (
+        {"error" in data && (data as any).error && (
           <div className="bg-red-500/10 border border-red-400/20 text-red-300 px-6 py-4 rounded-2xl">
-            <p className="text-sm">{data.error as string}</p>
+            <p className="text-sm">{String((data as any).error)}</p>
           </div>
         )}
 

@@ -249,6 +249,8 @@ export interface MerchantProduct {
   };
   technicalSpecs?: Array<{ label: string; value: string }>;
   smartContractRules?: Array<{ icon: string; title: string; description: string }>;
+  isBurnToClaim?: boolean;
+  maxSupply?: number | null;
 }
 
 export interface PricingBreakdown {
