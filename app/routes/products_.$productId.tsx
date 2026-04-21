@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type {
   LoaderFunctionArgs,
   ActionFunctionArgs,
@@ -13,6 +13,7 @@ import type { MerchantProduct } from "~/lib/types";
 import { pageMeta } from "~/lib/seo";
 import { AnimatedPage } from "~/components/ui/AnimatedPage";
 import { useConfirm } from "~/components/ui/ConfirmModal";
+import { useToast } from "~/components/ui/Toast";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -83,13 +84,40 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 export default function ProductDetail() {
   const { product, error } = useLoaderData<typeof loader>();
-  const fetcher = useFetcher<{ error?: string }>();
+  const fetcher = useFetcher<{ error?: string; success?: boolean }>();
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState<number>(0);
 
   const isSubmitting = fetcher.state === "submitting";
   const { confirm: confirmDialog } = useConfirm();
+  const { toast } = useToast();
+
+  // SEO controlled state — syncs with product from loader
+  const [seoTitle, setSeoTitle] = useState(product?.seoTitle ?? "");
+  const [seoDescription, setSeoDescription] = useState(product?.seoDescription ?? "");
+  const [seoTagsText, setSeoTagsText] = useState((product?.seoTags ?? []).join(", "));
+  const [seoHandle, setSeoHandle] = useState(product?.seoHandle ?? "");
+
+  // Sync SEO state when product loader data changes (after regenerate/save)
+  useEffect(() => {
+    if (!product) return;
+    setSeoTitle(product.seoTitle ?? "");
+    setSeoDescription(product.seoDescription ?? "");
+    setSeoTagsText((product.seoTags ?? []).join(", "));
+    setSeoHandle(product.seoHandle ?? "");
+  }, [product?.seoTitle, product?.seoDescription, product?.seoTags, product?.seoHandle]);
+
+  // Show toast feedback on fetcher completion
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data) {
+      if (fetcher.data.error) {
+        toast(fetcher.data.error, "error");
+      } else if (fetcher.data.success) {
+        toast("Saved", "success");
+      }
+    }
+  }, [fetcher.state, fetcher.data, toast]);
 
   // All hooks must run before any conditional returns
   const providerProduct = product?.providerProduct;
@@ -652,11 +680,11 @@ export default function ProductDetail() {
                 <input type="hidden" name="intent" value="regenerate-seo" />
                 <button
                   type="submit"
-                  className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-primary hover:underline flex items-center gap-1 disabled:opacity-50"
                   disabled={isSubmitting}
                 >
-                  <span className="material-symbols-outlined text-sm">auto_awesome</span>
-                  Regenerate
+                  <span className={`material-symbols-outlined text-sm ${isSubmitting ? "animate-spin" : ""}`}>auto_awesome</span>
+                  {isSubmitting ? "Generating..." : "Regenerate"}
                 </button>
               </fetcher.Form>
             </div>
@@ -668,32 +696,35 @@ export default function ProductDetail() {
                 <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">SEO Title</label>
                 <input
                   name="seoTitle"
-                  defaultValue={product.seoTitle || ""}
+                  value={seoTitle}
+                  onChange={(e) => setSeoTitle(e.target.value)}
                   maxLength={70}
                   className="w-full mt-1 px-3 py-2 rounded-lg bg-surface-container-high border border-outline-variant/10 text-sm focus:border-primary focus:outline-none"
                   placeholder="50-60 characters optimal"
                 />
-                <p className="text-[10px] text-on-surface-variant mt-1">{(product.seoTitle || "").length} / 60</p>
+                <p className={`text-[10px] mt-1 ${seoTitle.length > 60 ? "text-amber-400" : "text-on-surface-variant"}`}>{seoTitle.length} / 60</p>
               </div>
 
               <div>
                 <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">SEO Description</label>
                 <textarea
                   name="seoDescription"
-                  defaultValue={product.seoDescription || ""}
+                  value={seoDescription}
+                  onChange={(e) => setSeoDescription(e.target.value)}
                   maxLength={200}
                   rows={3}
                   className="w-full mt-1 px-3 py-2 rounded-lg bg-surface-container-high border border-outline-variant/10 text-sm focus:border-primary focus:outline-none resize-none"
                   placeholder="150-160 characters optimal"
                 />
-                <p className="text-[10px] text-on-surface-variant mt-1">{(product.seoDescription || "").length} / 160</p>
+                <p className={`text-[10px] mt-1 ${seoDescription.length > 160 ? "text-amber-400" : "text-on-surface-variant"}`}>{seoDescription.length} / 160</p>
               </div>
 
               <div>
                 <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Tags (comma-separated)</label>
                 <input
                   name="seoTags"
-                  defaultValue={(product.seoTags || []).join(", ")}
+                  value={seoTagsText}
+                  onChange={(e) => setSeoTagsText(e.target.value)}
                   className="w-full mt-1 px-3 py-2 rounded-lg bg-surface-container-high border border-outline-variant/10 text-sm focus:border-primary focus:outline-none"
                   placeholder="t-shirt, streetwear, unisex"
                 />
@@ -703,24 +734,24 @@ export default function ProductDetail() {
                 <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">URL Handle</label>
                 <input
                   name="seoHandle"
-                  defaultValue={product.seoHandle || ""}
-                  pattern="[a-z0-9-]+"
+                  value={seoHandle}
+                  onChange={(e) => setSeoHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-"))}
                   className="w-full mt-1 px-3 py-2 rounded-lg bg-surface-container-high border border-outline-variant/10 text-sm font-mono focus:border-primary focus:outline-none"
                   placeholder="cotton-heritage-tee"
                 />
-                {product.store?.shopifyDomain && product.seoHandle && (
-                  <p className="text-[10px] text-on-surface-variant mt-1">
-                    https://{product.store.shopifyDomain}/products/{product.seoHandle}
+                {product.store?.shopifyDomain && seoHandle && (
+                  <p className="text-[10px] text-on-surface-variant mt-1 truncate">
+                    https://{product.store.shopifyDomain}/products/{seoHandle}
                   </p>
                 )}
               </div>
 
               <button
                 type="submit"
-                className="w-full px-4 py-2 rounded-lg bg-primary/20 text-primary border border-primary/20 font-bold text-sm hover:bg-primary/30 transition-colors"
+                className="w-full px-4 py-2 rounded-lg bg-primary/20 text-primary border border-primary/20 font-bold text-sm hover:bg-primary/30 transition-colors disabled:opacity-50"
                 disabled={isSubmitting}
               >
-                Save SEO Changes
+                {isSubmitting ? "Saving..." : "Save SEO Changes"}
               </button>
             </fetcher.Form>
           </section>
