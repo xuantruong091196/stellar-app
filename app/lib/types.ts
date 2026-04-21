@@ -251,6 +251,10 @@ export interface MerchantProduct {
   smartContractRules?: Array<{ icon: string; title: string; description: string }>;
   isBurnToClaim?: boolean;
   maxSupply?: number | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  seoTags?: string[];
+  seoHandle?: string | null;
 }
 
 export interface PricingBreakdown {

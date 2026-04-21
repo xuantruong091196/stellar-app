@@ -7,7 +7,7 @@ import type {
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useFetcher, Link } from "@remix-run/react";
 
-import { apiGet, apiPost, apiDelete } from "~/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
 import type { MerchantProduct } from "~/lib/types";
 import { pageMeta } from "~/lib/seo";
@@ -59,6 +59,24 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const r = await apiDelete(`/products/${productId}`, walletAddress);
     if (r.error) return json({ error: r.error }, { status: r.status || 500 });
     return redirect("/products");
+  }
+  if (intent === "regenerate-seo") {
+    const r = await apiPost(`/products/${productId}/generate-seo`, {}, walletAddress);
+    return r.error
+      ? json({ error: r.error }, { status: r.status || 500 })
+      : json({ success: true, seo: r.data });
+  }
+  if (intent === "update-seo") {
+    const body = {
+      seoTitle: formData.get("seoTitle") as string,
+      seoDescription: formData.get("seoDescription") as string,
+      seoTags: (formData.get("seoTags") as string)?.split(",").map((t) => t.trim()).filter(Boolean) || [],
+      seoHandle: formData.get("seoHandle") as string,
+    };
+    const r = await apiPatch(`/products/${productId}/seo`, body, walletAddress);
+    return r.error
+      ? json({ error: r.error }, { status: r.status || 500 })
+      : json({ success: true, seo: r.data });
   }
   return json({ error: "Unknown intent" }, { status: 400 });
 }
@@ -621,6 +639,90 @@ export default function ProductDetail() {
                 Syncing via Stellar Oracle
               </span>
             </div>
+          </section>
+
+          {/* SEO Section */}
+          <section className="bg-surface-container-low rounded-xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-headline font-bold text-lg">SEO & Metadata</h2>
+                <p className="text-xs text-on-surface-variant">Powered by AI — Shopify sees this first</p>
+              </div>
+              <fetcher.Form method="post">
+                <input type="hidden" name="intent" value="regenerate-seo" />
+                <button
+                  type="submit"
+                  className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                  disabled={isSubmitting}
+                >
+                  <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                  Regenerate
+                </button>
+              </fetcher.Form>
+            </div>
+
+            <fetcher.Form method="post" className="space-y-3">
+              <input type="hidden" name="intent" value="update-seo" />
+
+              <div>
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">SEO Title</label>
+                <input
+                  name="seoTitle"
+                  defaultValue={product.seoTitle || ""}
+                  maxLength={70}
+                  className="w-full mt-1 px-3 py-2 rounded-lg bg-surface-container-high border border-outline-variant/10 text-sm focus:border-primary focus:outline-none"
+                  placeholder="50-60 characters optimal"
+                />
+                <p className="text-[10px] text-on-surface-variant mt-1">{(product.seoTitle || "").length} / 60</p>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">SEO Description</label>
+                <textarea
+                  name="seoDescription"
+                  defaultValue={product.seoDescription || ""}
+                  maxLength={200}
+                  rows={3}
+                  className="w-full mt-1 px-3 py-2 rounded-lg bg-surface-container-high border border-outline-variant/10 text-sm focus:border-primary focus:outline-none resize-none"
+                  placeholder="150-160 characters optimal"
+                />
+                <p className="text-[10px] text-on-surface-variant mt-1">{(product.seoDescription || "").length} / 160</p>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Tags (comma-separated)</label>
+                <input
+                  name="seoTags"
+                  defaultValue={(product.seoTags || []).join(", ")}
+                  className="w-full mt-1 px-3 py-2 rounded-lg bg-surface-container-high border border-outline-variant/10 text-sm focus:border-primary focus:outline-none"
+                  placeholder="t-shirt, streetwear, unisex"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">URL Handle</label>
+                <input
+                  name="seoHandle"
+                  defaultValue={product.seoHandle || ""}
+                  pattern="[a-z0-9-]+"
+                  className="w-full mt-1 px-3 py-2 rounded-lg bg-surface-container-high border border-outline-variant/10 text-sm font-mono focus:border-primary focus:outline-none"
+                  placeholder="cotton-heritage-tee"
+                />
+                {product.store?.shopifyDomain && product.seoHandle && (
+                  <p className="text-[10px] text-on-surface-variant mt-1">
+                    https://{product.store.shopifyDomain}/products/{product.seoHandle}
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                className="w-full px-4 py-2 rounded-lg bg-primary/20 text-primary border border-primary/20 font-bold text-sm hover:bg-primary/30 transition-colors"
+                disabled={isSubmitting}
+              >
+                Save SEO Changes
+              </button>
+            </fetcher.Form>
           </section>
 
           {/* NFT Info */}
