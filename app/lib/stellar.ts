@@ -109,12 +109,26 @@ export async function signSignInMessage(message: string): Promise<string> {
 }
 
 /**
- * Sign a Stellar transaction XDR. Retained for on-chain escrow flows.
+ * Reads STELLAR_NETWORK from window.ENV (injected via root.tsx loader)
+ * and returns the matching passphrase. Defaults to testnet for safety.
+ */
+function getNetworkPassphrase(): string {
+  const network =
+    typeof window !== "undefined" &&
+    (window as unknown as { ENV?: { STELLAR_NETWORK?: string } }).ENV?.STELLAR_NETWORK;
+  return network === "public"
+    ? "Public Global Stellar Network ; September 2015"
+    : "Test SDF Network ; September 2015";
+}
+
+/**
+ * Sign a Stellar transaction XDR. Network passphrase is read from window.ENV
+ * so that mainnet deployments correctly produce mainnet-signed transactions.
  * V6 returns `{ signedTxXdr, signerAddress, error? }`.
  */
 export async function signTransactionXdr(xdr: string): Promise<string> {
   const result = await signTransaction(xdr, {
-    networkPassphrase: "Test SDF Network ; September 2015",
+    networkPassphrase: getNetworkPassphrase(),
   });
   if (!result || (result as { error?: unknown }).error) {
     throw new Error(

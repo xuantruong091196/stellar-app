@@ -34,6 +34,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     userAddress,
     ENV: {
       PUBLIC_API_URL: publicApiUrl,
+      STELLAR_NETWORK: process.env.STELLAR_NETWORK || "testnet",
     },
   });
 }
