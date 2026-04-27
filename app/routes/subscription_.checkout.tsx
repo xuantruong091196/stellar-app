@@ -33,21 +33,8 @@ export async function action({ request }: ActionFunctionArgs) {
     return r.error ? json({ error: r.error }, { status: r.status || 500 }) : json({ quote: r.data });
   }
 
-  // Step 2: Server builds payment XDR for buyer's Stellar address
-  if (intent === 'prepare-xdr') {
-    const r = await apiPost<{ xdr: string; lockId: string }>(
-      '/subscription/checkout',
-      {
-        lockId: formData.get('lockId'),
-        walletMode: 'freighter',
-        sourceAddress: formData.get('sourceAddress'),
-      },
-      wallet,
-    );
-    return r.error ? json({ error: r.error }, { status: r.status || 500 }) : json({ xdrPayload: r.data });
-  }
-
-  // Step 3: Submit signed XDR to activate subscription
+  // Step 2: Submit signed XDR to activate subscription
+  // (XDR preparation happens in /api/subscription/prepare-xdr.ts to return pure JSON)
   if (intent === 'confirm') {
     const r = await apiPost<{ id: string; expiresAt: string; txHash: string }>(
       '/subscription/checkout/confirm',
@@ -99,14 +86,14 @@ export default function Checkout() {
       setSourceAddress(addr);
 
       // 2. Ask backend for unsigned XDR (does NOT consume lock yet)
-      const prepFd = new FormData();
-      prepFd.set('intent', 'prepare-xdr');
-      prepFd.set('lockId', quote.id);
-      prepFd.set('sourceAddress', addr);
-      const prepRes = await fetch('/subscription/checkout', { method: 'POST', body: prepFd });
+      const prepRes = await fetch('/api/subscription/prepare-xdr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lockId: quote.id, sourceAddress: addr }),
+      });
       const prepData = await prepRes.json();
       if (prepData.error) throw new Error(prepData.error);
-      const { xdr } = prepData.xdrPayload;
+      const { xdr } = prepData;
 
       // 3. Sign XDR via Freighter
       setStage('signing');
