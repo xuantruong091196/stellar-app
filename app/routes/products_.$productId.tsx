@@ -5,7 +5,7 @@ import type {
   MetaFunction,
 } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useFetcher, Link } from "@remix-run/react";
+import { useLoaderData, useFetcher, useRevalidator, Link } from "@remix-run/react";
 
 import { apiGet, apiPost, apiPatch, apiDelete } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
@@ -66,6 +66,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return r.error
       ? json({ error: r.error }, { status: r.status || 500 })
       : json({ success: true, seo: r.data });
+  }
+  if (intent === "regenerate-mockups") {
+    const r = await apiPost(
+      `/products/${productId}/regenerate-mockups`,
+      {},
+      walletAddress,
+    );
+    return r.error
+      ? json({ error: r.error }, { status: r.status || 500 })
+      : json({ success: true });
   }
   if (intent === "update-seo") {
     const body = {
@@ -153,7 +163,9 @@ export default function ProductDetail() {
     // Only show mockups that match THIS product's providerProduct type.
     // A design can be used across multiple products (t-shirt, mug, hoodie)
     // so we must not mix mockups from different product types.
-    const mine = mockups.filter((m) => m.productType === productType);
+    const mine = mockups.filter(
+      (m) => m.productType === productType && m.variant !== "design-overlay",
+    );
     if (mine.length > 0) {
       const editorFirst = [
         ...mine.filter((m) => m.variant === "editor-export"),
@@ -179,6 +191,31 @@ export default function ProductDetail() {
     if (!productType) return false;
     return !product.design.mockups.some((m) => m.productType === productType);
   }, [product, providerProduct]);
+
+  const expectedColorCount = useMemo(() => {
+    const colors = providerProduct?.blankImages
+      ? Object.keys(providerProduct.blankImages as Record<string, string>)
+      : [];
+    return colors.length;
+  }, [providerProduct]);
+
+  const generatingPreviews = useMemo(() => {
+    if (!product) return false;
+    // Stop chasing after 5 minutes — at that point either it failed or
+    // the product genuinely has no color variants (SAM-failed).
+    const ageMs = Date.now() - new Date(product.createdAt).getTime();
+    if (ageMs > 5 * 60 * 1000) return false;
+    const haveEditorExport = images.some((i) => i.label === "Preview");
+    const colorVariantsCount = images.length - (haveEditorExport ? 1 : 0);
+    return colorVariantsCount < expectedColorCount;
+  }, [product, images, expectedColorCount]);
+
+  const revalidator = useRevalidator();
+  useEffect(() => {
+    if (!generatingPreviews) return;
+    const id = setInterval(() => revalidator.revalidate(), 2000);
+    return () => clearInterval(id);
+  }, [generatingPreviews, revalidator]);
 
   if (error || !product) {
     return (
@@ -392,6 +429,33 @@ export default function ProductDetail() {
                     </span>
                   </div>
                 ))}
+            </div>
+          )}
+
+          {generatingPreviews && (
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-400/20 text-amber-300 text-xs">
+              <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Generating color previews…
+            </div>
+          )}
+
+          {!generatingPreviews && images.length === 1 && expectedColorCount > 0 && (
+            <div className="mt-3 flex items-center gap-3">
+              <p className="text-xs text-on-surface-variant">
+                Some color previews unavailable for this product.
+              </p>
+              <fetcher.Form method="post">
+                <input type="hidden" name="intent" value="regenerate-mockups" />
+                <button
+                  type="submit"
+                  className="text-xs px-3 py-1.5 rounded-full bg-surface-container-high hover:bg-primary/10 text-primary"
+                >
+                  Retry
+                </button>
+              </fetcher.Form>
             </div>
           )}
 
