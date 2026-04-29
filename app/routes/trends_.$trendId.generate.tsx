@@ -39,8 +39,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const r = await apiGet<{ id: string; status: string; designId: string | null; errorMessage: string | null }>(
       `/trends/designs/${trendDesignId}`, wallet,
     );
+    if (r.error) return json({ error: r.error }, { status: r.status || 500 });
     if (r.data?.status === 'COMPLETED' && r.data.designId) {
-      return redirect(`/designs/${r.data.designId}/edit`);
+      // Designs are edited inside the product creation flow — there is no
+      // standalone /designs/:id/edit route. Land the user on products/new
+      // pre-seeded with the freshly-generated design.
+      return redirect(`/products/new?designId=${r.data.designId}`);
     }
     return json({ ...r.data });
   }
@@ -76,6 +80,18 @@ export default function GenerateDesign() {
       <div className="max-w-2xl mx-auto space-y-6">
         <h1 className="text-2xl font-bold font-headline">Generate Design from Trend</h1>
 
+        {!trendDesignId && fetcher.data?.error && (
+          <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-300">
+            {fetcher.data.error}
+          </div>
+        )}
+
+        {!trendDesignId && products.length === 0 && (
+          <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-300">
+            Không có provider product nào để generate. Vui lòng cấu hình Provider Products trước.
+          </div>
+        )}
+
         {!trendDesignId && (
           <fetcher.Form method="post" className="space-y-4">
             <input type="hidden" name="intent" value="start" />
@@ -92,8 +108,12 @@ export default function GenerateDesign() {
                 ))}
               </select>
             </div>
-            <button type="submit" className="w-full px-6 py-3 rounded-full stellar-gradient text-white font-bold text-sm">
-              Start Generation
+            <button
+              type="submit"
+              disabled={products.length === 0 || fetcher.state !== "idle"}
+              className="w-full px-6 py-3 rounded-full stellar-gradient text-white font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {fetcher.state !== "idle" ? "Starting…" : "Start Generation"}
             </button>
           </fetcher.Form>
         )}
