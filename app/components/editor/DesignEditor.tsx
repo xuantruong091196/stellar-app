@@ -40,6 +40,7 @@ interface DesignEditorProps {
     layers: object;
     exportDataUrl: string;
     mockupDataUrl: string;
+    overlayDataUrl: string;
     printConfig: PrintConfigResult;
   }) => void;
   isSaving?: boolean;
@@ -99,6 +100,37 @@ function computePrintConfig(
   return { printArea: printAreaName, x, y, scale, rotation };
 }
 
+/**
+ * Export the design layer alone (no blank, no print-area overlay) at the
+ * blank-photo's pixel density. The exported PNG keeps a transparent
+ * background so it can be composited onto recolored blanks server-side.
+ *
+ * `multiplier` is clamped to [2, 6] to balance fidelity vs. payload size.
+ */
+function exportDesignOnly(
+  canvas: { getObjects: () => unknown[]; getWidth: () => number; renderAll: () => void; toDataURL: (opts: any) => string },
+  blankPxWidth: number,
+): string {
+  const objs = canvas.getObjects() as any[];
+  const blank = objs.find((o) => o.name === '__blank');
+  const printArea = objs.find((o) => o.name === '__printArea');
+  const prevBlankVisible = blank?.visible;
+  const prevPrintAreaVisible = printArea?.visible;
+  if (blank) blank.visible = false;
+  if (printArea) printArea.visible = false;
+  canvas.renderAll();
+  const multiplier = Math.max(2, Math.min(6, Math.round(blankPxWidth / canvas.getWidth())));
+  const dataUrl = canvas.toDataURL({
+    format: 'png',
+    enableRetinaScaling: false,
+    multiplier,
+  });
+  if (blank) blank.visible = prevBlankVisible;
+  if (printArea) printArea.visible = prevPrintAreaVisible;
+  canvas.renderAll();
+  return dataUrl;
+}
+
 const PANEL_TITLES: Record<PanelTab, string> = {
   elements: "Elements",
   text: "Text",
@@ -122,6 +154,14 @@ export function DesignEditor({
   const [activeTab, setActiveTab] = useState<PanelTab | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [cssScale, setCssScale] = useState(1);
+  const [blankPxWidth, setBlankPxWidth] = useState<number>(1200);
+
+  useEffect(() => {
+    if (!blankImageUrl) return;
+    const img = new Image();
+    img.onload = () => setBlankPxWidth(img.naturalWidth);
+    img.src = blankImageUrl;
+  }, [blankImageUrl]);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const initialImageLoaded = useRef(false);
 
@@ -196,7 +236,13 @@ export function DesignEditor({
         console.warn("Export failed (tainted canvas), saving layers only");
       }
       const printConfig = computePrintConfig(canvas, displayPrintArea, activePrintArea);
-      onSave({ printArea: activePrintArea, layers, exportDataUrl, mockupDataUrl, printConfig });
+      let overlayDataUrl = "";
+      try {
+        overlayDataUrl = exportDesignOnly(canvas as any, blankPxWidth);
+      } catch {
+        console.warn("Design overlay export failed (tainted canvas), saving without overlay");
+      }
+      onSave({ printArea: activePrintArea, layers, exportDataUrl, mockupDataUrl, overlayDataUrl, printConfig });
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (err) {
@@ -204,7 +250,7 @@ export function DesignEditor({
       setSaveStatus("error");
       setTimeout(() => setSaveStatus("idle"), 3000);
     }
-  }, [canvas, displayPrintArea, activePrintArea, onSave]);
+  }, [canvas, displayPrintArea, activePrintArea, blankPxWidth, onSave]);
 
   // Keyboard shortcuts
   useEffect(() => {

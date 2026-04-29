@@ -81,6 +81,7 @@ export async function action({ request }: ActionFunctionArgs) {
     };
 
     const mockupDataUrl = formData.get("mockupDataUrl") as string | null;
+    const overlayDataUrl = formData.get("overlayDataUrl") as string | null;
 
     const isBurnToClaim = formData.get("isBurnToClaim") === "true";
     const maxSupplyStr = formData.get("maxSupply") as string | null;
@@ -95,6 +96,7 @@ export async function action({ request }: ActionFunctionArgs) {
         retailPrice,
         printConfig,
         ...(mockupDataUrl ? { mockupDataUrl } : {}),
+        ...(overlayDataUrl ? { overlayDataUrl } : {}),
         ...(isBurnToClaim ? { isBurnToClaim: true } : {}),
         ...(maxSupply ? { maxSupply } : {}),
       },
@@ -165,6 +167,7 @@ export default function CreateProduct() {
   const [editorLayers, setEditorLayers] = useState<object | null>(null);
   const [editorExportUrl, setEditorExportUrl] = useState<string | null>(null);
   const [editorMockupUrl, setEditorMockupUrl] = useState<string | null>(null);
+  const [editorOverlayUrl, setEditorOverlayUrl] = useState<string | null>(null);
   const [editorPrintConfig, setEditorPrintConfig] = useState<PrintConfig | null>(null);
   const [targetMargin, setTargetMargin] = useState(30);
 
@@ -626,6 +629,7 @@ export default function CreateProduct() {
               setEditorLayers(data.layers);
               setEditorExportUrl(data.exportDataUrl);
               setEditorMockupUrl(data.mockupDataUrl);
+              setEditorOverlayUrl(data.overlayDataUrl);
               setSelectedPrintArea(data.printArea);
               setEditorPrintConfig(data.printConfig);
             }}
@@ -840,6 +844,13 @@ export default function CreateProduct() {
                   type="hidden"
                   name="mockupDataUrl"
                   value={editorMockupUrl}
+                />
+              )}
+              {editorOverlayUrl && (
+                <input
+                  type="hidden"
+                  name="overlayDataUrl"
+                  value={editorOverlayUrl}
                 />
               )}
               <Button
