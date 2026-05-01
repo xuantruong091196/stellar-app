@@ -3,6 +3,7 @@ import { useFabricCanvas } from "./hooks/useFabricCanvas";
 import { useHistory } from "./hooks/useHistory";
 import { useGoogleFonts } from "./hooks/useGoogleFonts";
 import { exportAtPrintDPI, exportFullCanvas } from "./utils/export";
+import { apiPost } from "~/lib/api";
 import { IconToolbar } from "./IconToolbar";
 import type { PanelTab } from "./IconToolbar";
 import { ExpandablePanel } from "./ExpandablePanel";
@@ -33,6 +34,7 @@ interface DesignEditorProps {
   blankImageUrl: string;
   printAreas: PrintAreaDef[];
   designImageUrl?: string;
+  designId?: string;
   initialLayers?: object | null;
   apiBaseUrl: string;
   onSave: (data: {
@@ -143,6 +145,7 @@ export function DesignEditor({
   blankImageUrl,
   printAreas,
   designImageUrl,
+  designId,
   initialLayers,
   apiBaseUrl,
   onSave,
@@ -222,6 +225,111 @@ export function DesignEditor({
   }, [isReady, canvas]);
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+
+  // Layer-extraction (SAM-2 click-to-extract): tracks the current source URL
+  // of the design image as successive extracts produce punched-out versions.
+  const [currentDesignUrl, setCurrentDesignUrl] = useState<string | null>(
+    designImageUrl || null,
+  );
+  const [extractMode, setExtractMode] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+
+  useEffect(() => {
+    setCurrentDesignUrl(designImageUrl || null);
+  }, [designImageUrl]);
+
+  // While extract mode is on, treat the next canvas click as an extract
+  // request. Find the topmost user image at the click point, translate the
+  // pointer into image-local pixel space, call the API, then swap the
+  // image's source with the punched version + add the layer alongside.
+  useEffect(() => {
+    if (!canvas || !extractMode || !designId) return;
+
+    let cancelled = false;
+    const handler = async (opt: { e: MouseEvent | TouchEvent }) => {
+      if (cancelled || isExtracting) return;
+      const fabric = await import("fabric");
+      const pointer = canvas.getPointer(opt.e);
+      // Find the topmost image (skip blank + printArea overlay).
+      const targets = (canvas.getObjects() as any[])
+        .filter(
+          (o) =>
+            o.type === "image" &&
+            o.name !== "__blank" &&
+            o.name !== "__printArea" &&
+            o.containsPoint(new fabric.Point(pointer.x, pointer.y)),
+        )
+        .reverse();
+      const target = targets[0];
+      if (!target) return; // clicked empty area — no-op
+
+      const sourceUrl: string | null =
+        target.__designSource || (target === targets[0] ? currentDesignUrl : null);
+      if (!sourceUrl) return;
+
+      const localX = (pointer.x - (target.left || 0)) / (target.scaleX || 1);
+      const localY = (pointer.y - (target.top || 0)) / (target.scaleY || 1);
+
+      setIsExtracting(true);
+      try {
+        const res = await apiPost<{
+          layerUrl: string;
+          punchedUrl: string;
+          bbox: { x: number; y: number; width: number; height: number };
+        }>(
+          `/designs/detail/${designId}/extract-layer`,
+          { sourceUrl, px: Math.round(localX), py: Math.round(localY) },
+        );
+        if (cancelled) return;
+        if (res.error || !res.data) {
+          console.warn("extractLayer:", res.error);
+          return;
+        }
+        const { layerUrl, punchedUrl, bbox } = res.data;
+
+        // Swap the source image with the punched version, preserving
+        // position/scale so the visible layout doesn't shift.
+        await target.setSrc(punchedUrl, { crossOrigin: "anonymous" });
+        target.__designSource = punchedUrl;
+        if (target === targets[0]) setCurrentDesignUrl(punchedUrl);
+
+        // Add the extracted layer at its bbox position, scaled to match.
+        const layerImg = await fabric.FabricImage.fromURL(layerUrl, {
+          crossOrigin: "anonymous",
+        });
+        layerImg.set({
+          left: (target.left || 0) + bbox.x * (target.scaleX || 1),
+          top: (target.top || 0) + bbox.y * (target.scaleY || 1),
+          scaleX: target.scaleX,
+          scaleY: target.scaleY,
+          selectable: true,
+          evented: true,
+        });
+        (layerImg as any).__extractedLayer = true;
+        layerImg.setCoords();
+        canvas.add(layerImg);
+        canvas.setActiveObject(layerImg);
+        canvas.requestRenderAll();
+      } catch (e) {
+        console.error("extractLayer failed:", e);
+      } finally {
+        if (!cancelled) {
+          setIsExtracting(false);
+          setExtractMode(false);
+        }
+      }
+    };
+
+    canvas.on("mouse:down", handler);
+    canvas.defaultCursor = "crosshair";
+    canvas.hoverCursor = "crosshair";
+    return () => {
+      cancelled = true;
+      canvas.off("mouse:down", handler);
+      canvas.defaultCursor = "default";
+      canvas.hoverCursor = "move";
+    };
+  }, [canvas, extractMode, designId, currentDesignUrl, isExtracting]);
 
   const handleSave = useCallback(() => {
     if (!canvas) return;
@@ -491,7 +599,16 @@ export function DesignEditor({
         </div>
       </div>
 
-      <BottomBar canvas={canvas} onSave={handleSave} isSaving={isSaving} saveStatus={saveStatus} />
+      <BottomBar
+        canvas={canvas}
+        onSave={handleSave}
+        isSaving={isSaving}
+        saveStatus={saveStatus}
+        extractAvailable={!!designId}
+        extractMode={extractMode}
+        isExtracting={isExtracting}
+        onToggleExtract={() => setExtractMode((m) => !m)}
+      />
     </div>
   );
 }
