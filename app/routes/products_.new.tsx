@@ -619,6 +619,7 @@ export default function CreateProduct() {
             designImageUrl={
               selectedDesign.fileUrl || selectedDesign.thumbnailUrl || undefined
             }
+            designId={selectedDesign.id}
             initialLayers={editorLayers}
             apiBaseUrl={
               typeof window !== "undefined"

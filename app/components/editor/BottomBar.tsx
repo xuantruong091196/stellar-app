@@ -6,6 +6,10 @@ interface BottomBarProps {
   onSave: () => void;
   isSaving: boolean;
   saveStatus: "idle" | "saved" | "error";
+  extractMode?: boolean;
+  onToggleExtract?: () => void;
+  isExtracting?: boolean;
+  extractAvailable?: boolean;
 }
 
 export function BottomBar({
@@ -13,6 +17,10 @@ export function BottomBar({
   onSave,
   isSaving,
   saveStatus,
+  extractMode = false,
+  onToggleExtract,
+  isExtracting = false,
+  extractAvailable = false,
 }: BottomBarProps) {
   const [zoom, setZoom] = useState(1);
 
@@ -55,6 +63,24 @@ export function BottomBar({
           <span className="material-symbols-outlined text-sm">fit_screen</span>
         </button>
       </div>
+
+      {extractAvailable && onToggleExtract && (
+        <button
+          onClick={onToggleExtract}
+          disabled={isExtracting}
+          title={extractMode ? "Exit extract mode" : "Extract layer (click on image)"}
+          className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-50 transition-all mr-2 ${
+            extractMode
+              ? "bg-amber-500 text-white"
+              : "bg-surface-container-high hover:bg-surface-container-highest text-on-surface"
+          }`}
+        >
+          <span className="material-symbols-outlined text-sm">
+            {isExtracting ? "hourglass_empty" : "auto_fix_high"}
+          </span>
+          {isExtracting ? "Extracting…" : extractMode ? "Click image" : "Tách lớp"}
+        </button>
+      )}
 
       <button
         onClick={onSave}
