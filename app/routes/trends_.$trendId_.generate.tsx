@@ -13,7 +13,7 @@ export const meta: MetaFunction = () => pageMeta({ title: "Generate Design", noI
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const wallet = await requireUser(request);
   const productsRes = await apiGet<{ data: Array<{ id: string; name: string; productType: string }> }>(
-    `/provider-products?limit=20&active=true`, wallet,
+    `/provider-products?limit=20&isActive=true`, wallet,
   );
   return json({ trendId: params.trendId, products: productsRes.data?.data || [] });
 }
