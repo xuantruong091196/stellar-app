@@ -13,7 +13,7 @@ export const meta: MetaFunction = () => pageMeta({ title: "Generate Design", noI
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const wallet = await requireUser(request);
   const productsRes = await apiGet<{ data: Array<{ id: string; name: string; productType: string }> }>(
-    `/provider-products?limit=20&isActive=true`, wallet,
+    `/provider-products?limit=20&active=true`, wallet,
   );
   return json({ trendId: params.trendId, products: productsRes.data?.data || [] });
 }
@@ -31,11 +31,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
       wallet,
     );
     if (r.error) return json({ error: r.error }, { status: r.status || 500 });
-    return json({ trendDesignId: r.data!.trendDesignId });
+    // Echo providerProductId back so the FE can carry it into each poll
+    // request — the trend_designs row doesn't store it, and we need it in
+    // the final redirect to seed /products/new past the product picker.
+    return json({ trendDesignId: r.data!.trendDesignId, providerProductId });
   }
 
   if (intent === 'poll') {
     const trendDesignId = formData.get('trendDesignId') as string;
+    const providerProductId = formData.get('providerProductId') as string;
     const r = await apiGet<{ id: string; status: string; designId: string | null; errorMessage: string | null }>(
       `/trends/designs/${trendDesignId}`, wallet,
     );
@@ -43,10 +47,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (r.data?.status === 'COMPLETED' && r.data.designId) {
       // Designs are edited inside the product creation flow — there is no
       // standalone /designs/:id/edit route. Land the user on products/new
-      // pre-seeded with the freshly-generated design.
-      return redirect(`/products/new?designId=${r.data.designId}`);
+      // pre-seeded with both the freshly-generated design AND the provider
+      // product the user already picked here, so they don't pick it twice.
+      const qp = new URLSearchParams({ designId: r.data.designId });
+      if (providerProductId) qp.set('providerProductId', providerProductId);
+      return redirect(`/products/new?${qp.toString()}`);
     }
-    return json({ ...r.data });
+    return json({ ...r.data, providerProductId });
   }
 
   return json({ error: 'Unknown intent' }, { status: 400 });
@@ -70,9 +77,15 @@ export default function GenerateDesign() {
       const fd = new FormData();
       fd.set('intent', 'poll');
       fd.set('trendDesignId', trendDesignId);
+      // Carry providerProductId through every poll so the action's final
+      // redirect can seed /products/new and skip the duplicate product pick.
+      const ppId = fetcher.data?.providerProductId;
+      if (ppId) fd.set('providerProductId', ppId);
       fetcher.submit(fd, { method: 'post' });
     }, 2000);
     return () => clearTimeout(t);
+    // Depend on fetcher.data (object ref, fresh each poll) not status (string)
+    // — string equality across two ticks would freeze the recursive setTimeout.
   }, [trendDesignId, fetcher.data]);
 
   return (

@@ -136,7 +136,13 @@ export default function CreateProduct() {
   const navigate = useNavigate();
   const { walletAddress } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
-  const preselectedBlankId = searchParams.get("blank");
+  // ?blank=…  — providers catalog → "Use this blank"
+  // ?providerProductId=…&designId=…  — trend generate → land on Step 2 with
+  //   both the AI-generated design and the user's chosen product preselected
+  //   so they don't pick the product twice.
+  const preselectedBlankId =
+    searchParams.get("providerProductId") || searchParams.get("blank");
+  const preselectedDesignId = searchParams.get("designId");
   const fetcher = useFetcher<{
     success?: boolean;
     error?: string;
@@ -231,6 +237,34 @@ export default function CreateProduct() {
       setStep(1);
     }
   }, [preselectedBlankId, providerProducts, selectedProduct]);
+
+  // Trend-design redirect lands here with `?designId=<id>` (and usually
+  // `?providerProductId=<id>` from the same query). Fetch the design and
+  // auto-select it; once both product and design are resolved, jump past
+  // the catalog/library pickers straight to Step 2 (configure + editor)
+  // — otherwise the user has to re-pick the product they already chose
+  // on the trend generate page.
+  useEffect(() => {
+    if (!preselectedDesignId || selectedDesign) return;
+    let cancelled = false;
+    (async () => {
+      const res = await apiGet<Design>(
+        `/designs/detail/${preselectedDesignId}`,
+        walletAddress,
+      );
+      if (cancelled) return;
+      if (res.data) setSelectedDesign(res.data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [preselectedDesignId, selectedDesign, walletAddress]);
+
+  useEffect(() => {
+    if (preselectedDesignId && selectedDesign && selectedProduct && step < 2) {
+      setStep(2);
+    }
+  }, [preselectedDesignId, selectedDesign, selectedProduct, step]);
 
   /** Compute pricing locally for instant feedback (no API call needed) */
   const computeLocalPricing = useCallback(
@@ -619,7 +653,6 @@ export default function CreateProduct() {
             designImageUrl={
               selectedDesign.fileUrl || selectedDesign.thumbnailUrl || undefined
             }
-            designId={selectedDesign.id}
             initialLayers={editorLayers}
             apiBaseUrl={
               typeof window !== "undefined"
