@@ -27,6 +27,7 @@ import { Button, LinkButton } from "~/components/ui/Button";
 import { pageMeta } from "~/lib/seo";
 import { NumericFormat } from "react-number-format";
 import { DesignEditor } from "~/components/editor/DesignEditor";
+import { ApplyToProductsModal } from "~/components/products/ApplyToProductsModal";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -170,6 +171,7 @@ export default function CreateProduct() {
   const CATALOG_PAGE_SIZE = 9;
   const [loadError, setLoadError] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
+  const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [editorLayers, setEditorLayers] = useState<object | null>(null);
   const [editorExportUrl, setEditorExportUrl] = useState<string | null>(null);
   const [editorMockupUrl, setEditorMockupUrl] = useState<string | null>(null);
@@ -980,10 +982,20 @@ export default function CreateProduct() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 justify-end">
+          <div className="flex items-center gap-3 justify-end flex-wrap">
             <LinkButton to="/products" variant="secondary">
               Save as Draft
             </LinkButton>
+            {createdProductId && providerProducts.length > 1 && (
+              <Button
+                type="button"
+                onClick={() => setApplyModalOpen(true)}
+                icon="auto_awesome_motion"
+                variant="secondary"
+              >
+                Apply to Other Products
+              </Button>
+            )}
             {createdProductId && (
               <fetcher.Form method="post">
                 <input type="hidden" name="intent" value="publish" />
@@ -999,6 +1011,23 @@ export default function CreateProduct() {
             )}
           </div>
         </section>
+      )}
+
+      {applyModalOpen && selectedProduct && selectedDesign && (
+        <ApplyToProductsModal
+          currentProviderProductId={selectedProduct.id}
+          providerProducts={providerProducts}
+          designId={selectedDesign.id}
+          overlayDataUrl={editorOverlayUrl}
+          walletAddress={walletAddress}
+          defaultTitle={title}
+          defaultRetailPrice={parseFloat(retailPrice) || 0}
+          onClose={() => setApplyModalOpen(false)}
+          onComplete={() => {
+            setApplyModalOpen(false);
+            navigate("/products");
+          }}
+        />
       )}
     </>
   );
