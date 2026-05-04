@@ -9,6 +9,7 @@ import type { PanelTab } from "./IconToolbar";
 import { ExpandablePanel } from "./ExpandablePanel";
 import { BottomBar } from "./BottomBar";
 import { ContextualToolbar } from "./ContextualToolbar";
+import { PrintReadinessBar } from "./PrintReadinessBar";
 import { LayerPanel } from "./panels/LayerPanel";
 import { TextPanel } from "./panels/TextPanel";
 import { ShapesPanel } from "./panels/ShapesPanel";
@@ -522,7 +523,13 @@ export function DesignEditor({
         loadFont={loadFont}
       />
 
-      <div className="flex gap-2" style={{ height: "calc(100vh - 180px)", minHeight: 500 }}>
+      <PrintReadinessBar
+        canvas={canvas}
+        revision={revision}
+        displayPrintArea={displayPrintArea}
+      />
+
+      <div className="flex gap-2" style={{ height: "calc(100vh - 220px)", minHeight: 500 }}>
         <IconToolbar
           activeTab={activeTab}
           onTabChange={setActiveTab}
