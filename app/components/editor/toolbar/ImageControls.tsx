@@ -32,45 +32,47 @@ export function ImageControls({ canvas, opacity }: ImageControlsProps) {
   );
 
   /**
-   * Inline Remove Background — 1-click on the selected image, like Canva's
-   * BG Remover. Renders the active image to base64 at 2x density, posts to
-   * /api/clipart/ai-remove-bg (Gemini editImage server-side), then swaps
-   * the source image with the returned transparent PNG while preserving
-   * position/scale/rotation. Loading state shows in-button so the user
-   * doesn't hunt for a side panel.
+   * Inline Remove Background — runs entirely client-side via @imgly/
+   * background-removal. Earlier we routed this through the server's
+   * Gemini editImage endpoint, but Gemini kept misinterpreting "output
+   * a transparent PNG" by literally drawing the checkerboard tile
+   * pattern (the visual indicator of transparency in design tools)
+   * into the pixels — so the user got a fake-transparent image with
+   * grey checker fill where the background should have been alpha-0.
+   *
+   * @imgly uses a real U2Net/ISNet ONNX model with proper alpha output.
+   * First call downloads ~80MB model into browser cache; subsequent
+   * calls run from cache and finish in 2-4s. Free, no server cost, no
+   * external API dependency.
    */
   const handleRemoveBg = useCallback(async () => {
     const obj = canvas.getActiveObject();
     if (!obj || obj.type !== "image") return;
 
-    let base64: string | null = null;
-    try {
-      const el = (obj as any).toCanvasElement({ multiplier: 2 });
-      base64 = el.toDataURL("image/png").split(",")[1];
-    } catch {
-      setBgError("Could not export image (CORS?)");
-      setBgState("error");
-      setTimeout(() => setBgState("idle"), 2500);
-      return;
-    }
-    if (!base64) return;
-
     setBgState("processing");
     setBgError("");
 
     try {
-      const res = await fetch("/api/clipart/ai-remove-bg", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64 }),
+      // Render the selected Fabric image to a Blob at 2x density.
+      const el = (obj as any).toCanvasElement({ multiplier: 2 });
+      const blob: Blob = await new Promise((resolve, reject) => {
+        el.toBlob(
+          (b: Blob | null) =>
+            b ? resolve(b) : reject(new Error("Failed to encode image")),
+          "image/png",
+        );
       });
-      if (!res.ok) throw new Error(`Remove BG failed: ${res.status}`);
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      if (!data.imageUrl) throw new Error("No image returned");
+
+      // Lazy-load @imgly so the 80MB model bundle isn't pulled into the
+      // initial editor chunk for users who never click Remove BG.
+      const { removeBackground } = await import("@imgly/background-removal");
+      const resultBlob = await removeBackground(blob);
+
+      // Convert result Blob → object URL for Fabric to consume.
+      const url = URL.createObjectURL(resultBlob);
 
       const fabric = await import("fabric");
-      const newImg = await fabric.FabricImage.fromURL(data.imageUrl, {
+      const newImg = await fabric.FabricImage.fromURL(url, {
         crossOrigin: "anonymous",
       });
       newImg.set({

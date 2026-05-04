@@ -56,22 +56,10 @@ export function AiToolsPanel({
 
   useEffect(() => () => stopTimer(), [stopTimer]);
 
-  const getSelectedImageBase64 = useCallback((): string | null => {
-    if (!canvas) return null;
-    const obj = canvas.getActiveObject();
-    if (!obj || obj.type !== "image") return null;
-    try {
-      const el = (obj as any).toCanvasElement({ multiplier: 2 });
-      return el.toDataURL("image/png").split(",")[1];
-    } catch {
-      return null;
-    }
-  }, [canvas]);
-
   const handleRemoveBg = useCallback(async () => {
-    if (!canvas || !apiBaseUrl) return;
-    const base64 = getSelectedImageBase64();
-    if (!base64) {
+    if (!canvas) return;
+    const obj = canvas.getActiveObject();
+    if (!obj || obj.type !== "image") {
       setErrorMsg("Select an image layer first");
       setState("error");
       return;
@@ -84,40 +72,42 @@ export function AiToolsPanel({
     abortRef.current = new AbortController();
 
     try {
-      const res = await fetch(`/api/clipart/ai-remove-bg`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64 }),
-        signal: abortRef.current.signal,
+      // Render selected Fabric image to a Blob at 2x density.
+      const el = (obj as any).toCanvasElement({ multiplier: 2 });
+      const blob: Blob = await new Promise((resolve, reject) => {
+        el.toBlob(
+          (b: Blob | null) =>
+            b ? resolve(b) : reject(new Error("Failed to encode image")),
+          "image/png",
+        );
       });
-      if (!res.ok) throw new Error(`Remove BG failed: ${res.status}`);
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
 
-      if (data.imageUrl) {
-        const obj = canvas.getActiveObject();
-        if (obj && obj.type === "image") {
-          const fabric = await import("fabric");
-          const newImg = await fabric.FabricImage.fromURL(data.imageUrl, {
-            crossOrigin: "anonymous",
-          });
-          newImg.set({
-            left: obj.left,
-            top: obj.top,
-            scaleX: obj.scaleX,
-            scaleY: obj.scaleY,
-            angle: obj.angle,
-            name: (obj as any).name || "bg-removed",
-            selectable: true,
-            evented: true,
-          });
-          newImg.setCoords();
-          canvas.remove(obj);
-          canvas.add(newImg);
-          canvas.setActiveObject(newImg);
-          canvas.requestRenderAll();
-        }
-      }
+      // Client-side U2Net/ISNet via @imgly. ~80MB model on first call,
+      // cached after. Replaced server Gemini call which drew checker
+      // pattern instead of producing real alpha transparency.
+      const { removeBackground } = await import("@imgly/background-removal");
+      const resultBlob = await removeBackground(blob);
+      const url = URL.createObjectURL(resultBlob);
+
+      const fabric = await import("fabric");
+      const newImg = await fabric.FabricImage.fromURL(url, {
+        crossOrigin: "anonymous",
+      });
+      newImg.set({
+        left: obj.left,
+        top: obj.top,
+        scaleX: obj.scaleX,
+        scaleY: obj.scaleY,
+        angle: obj.angle,
+        name: (obj as any).name || "bg-removed",
+        selectable: true,
+        evented: true,
+      });
+      newImg.setCoords();
+      canvas.remove(obj);
+      canvas.add(newImg);
+      canvas.setActiveObject(newImg);
+      canvas.requestRenderAll();
       setState("success");
       setTimeout(() => setState("idle"), 1500);
     } catch (err: any) {
@@ -130,7 +120,7 @@ export function AiToolsPanel({
     } finally {
       stopTimer();
     }
-  }, [canvas, apiBaseUrl, onSaveHistory, startTimer, stopTimer, getSelectedImageBase64]);
+  }, [canvas, onSaveHistory, startTimer, stopTimer]);
 
   const cancelRequest = useCallback(() => {
     abortRef.current?.abort();
