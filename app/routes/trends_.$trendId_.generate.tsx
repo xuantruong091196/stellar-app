@@ -73,7 +73,7 @@ export default function GenerateDesign() {
       fetcher.submit(fd, { method: 'post' });
     }, 2000);
     return () => clearTimeout(t);
-  }, [trendDesignId, fetcher.data?.status]);
+  }, [trendDesignId, fetcher.data]);
 
   return (
     <AnimatedPage>
