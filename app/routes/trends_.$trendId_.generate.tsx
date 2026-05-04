@@ -13,7 +13,7 @@ export const meta: MetaFunction = () => pageMeta({ title: "Generate Design", noI
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const wallet = await requireUser(request);
   const productsRes = await apiGet<{ data: Array<{ id: string; name: string; productType: string }> }>(
-    `/provider-products?limit=20&active=true`, wallet,
+    `/provider-products?limit=20&isActive=true`, wallet,
   );
   return json({ trendId: params.trendId, products: productsRes.data?.data || [] });
 }
@@ -101,7 +101,7 @@ export default function GenerateDesign() {
 
         {!trendDesignId && products.length === 0 && (
           <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-300">
-            Không có provider product nào để generate. Vui lòng cấu hình Provider Products trước.
+            No active provider products available. Please contact your admin to set up Provider Products before generating.
           </div>
         )}
 
