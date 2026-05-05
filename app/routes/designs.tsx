@@ -10,7 +10,7 @@ import { requireUser } from "~/lib/session.server";
 import type { Design, PaginatedResponse } from "~/lib/types";
 import { PageHeader, EmptyState } from "~/components/ui/PageHeader";
 import { LinkButton } from "~/components/ui/Button";
-import { Pill } from "~/components/ui/StatusPill";
+import { Pill, ProvenancePill } from "~/components/ui/StatusPill";
 import { pageMeta } from "~/lib/seo";
 import { AnimatedPage } from "~/components/ui/AnimatedPage";
 import { StaggerList, StaggerItem } from "~/components/ui/StaggerList";
@@ -168,6 +168,12 @@ export default function Designs() {
                           {d.copyrightTxHash.slice(0, 20)}…
                         </p>
                       </div>
+                    )}
+                    {d.provenance && (
+                      <ProvenancePill
+                        status={d.provenance.status}
+                        assetCode={d.provenance.assetCode}
+                      />
                     )}
                     <div className="flex items-center gap-2 pt-2">
                       <Link

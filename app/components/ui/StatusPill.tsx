@@ -84,3 +84,38 @@ export function OrderPill({ status }: { status: OrderStatus }) {
 export function ProductPill({ status }: { status: MerchantProductStatus }) {
   return <Pill tone={PRODUCT_TONE[status]}>{status}</Pill>;
 }
+
+type ProvenanceStatus = 'MINTING' | 'MINTED' | 'MINT_FAILED' | 'BURNED';
+
+const PROVENANCE_TONE: Record<ProvenanceStatus, PillTone> = {
+  MINTING: 'amber',
+  MINTED: 'green',
+  MINT_FAILED: 'red',
+  BURNED: 'slate',
+};
+
+const PROVENANCE_LABELS: Record<ProvenanceStatus, string> = {
+  MINTING: 'Minting…',
+  MINTED: 'Minted',
+  MINT_FAILED: 'Mint Failed',
+  BURNED: 'Burned',
+};
+
+export function ProvenancePill({
+  status,
+  assetCode,
+}: {
+  status: ProvenanceStatus;
+  assetCode?: string | null;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Pill tone={PROVENANCE_TONE[status]}>{PROVENANCE_LABELS[status]}</Pill>
+      {status === 'MINTED' && assetCode && (
+        <span className="text-[10px] font-mono text-on-surface-variant/60 truncate max-w-[80px]">
+          {assetCode}
+        </span>
+      )}
+    </div>
+  );
+}

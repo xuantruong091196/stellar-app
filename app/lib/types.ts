@@ -63,6 +63,10 @@ export interface Design {
   createdAt: string;
   updatedAt: string;
   mockups?: Mockup[];
+  provenance?: {
+    status: 'MINTING' | 'MINTED' | 'MINT_FAILED' | 'BURNED';
+    assetCode: string | null;
+  } | null;
 }
 
 export interface Mockup {
