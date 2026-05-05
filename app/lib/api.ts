@@ -149,6 +149,48 @@ export const apiDelete = <T>(endpoint: string, walletAddress?: string) =>
   api<T>(endpoint, { method: "DELETE", walletAddress });
 
 // ---------------------------------------------------------------------------
+// Gating endpoints
+// ---------------------------------------------------------------------------
+
+export interface GatingData {
+  merchantProductId: string;
+  assetCode: string;
+  issuerAddress: string;
+  assetType: "CLASSIC" | "SOROBAN_SAC";
+  minBalance: string;
+  errorMessage: string | null;
+  isActive: boolean;
+}
+
+export interface UpsertGatingPayload {
+  merchantProductId: string;
+  assetCode: string;
+  issuerAddress: string;
+  assetType: "CLASSIC" | "SOROBAN_SAC";
+  minBalance?: string;
+  errorMessage?: string;
+  isActive?: boolean;
+}
+
+/**
+ * Fetch the gating rule for a merchant product.
+ * Returns null when no rule exists (404 is treated as "not configured").
+ * Intended for use inside Remix server-side loaders.
+ */
+export async function getGatingServer(
+  productId: string,
+  walletAddress: string,
+): Promise<GatingData | null> {
+  const res = await apiGet<GatingData>(
+    `/gating?merchantProductId=${encodeURIComponent(productId)}`,
+    walletAddress,
+  );
+  if (res.status === 404) return null;
+  if (res.error) throw new Error(`getGating failed: ${res.error}`);
+  return res.data;
+}
+
+// ---------------------------------------------------------------------------
 // Public provenance endpoint — no auth required, safe to call from loaders
 // ---------------------------------------------------------------------------
 
