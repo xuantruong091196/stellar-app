@@ -12,24 +12,18 @@ export default defineConfig({
   server: {
     port: 3000,
   },
-  // @imgly/background-removal pulls in onnxruntime-web with a webgpu
-  // sub-export that Rollup can't statically resolve. The package is
-  // designed to be loaded dynamically at runtime (it picks the best
-  // ONNX backend per browser), so excluding it from prebundle + treating
-  // its ONNX deps as externals during SSR is the supported workaround.
+  // @imgly/background-removal dynamically imports onnxruntime-web (and
+  // its webgpu sub-export) at runtime to pick the best ONNX backend
+  // per browser. We exclude both from prebundle so Vite leaves the
+  // dynamic imports intact instead of trying to statically resolve
+  // every conditional path. ssr.noExternal forces them to be bundled
+  // for the SSR build (Remix loaders) — they shouldn't actually run
+  // server-side, but Remix needs the modules to be resolvable to type
+  // the dynamic import call.
   optimizeDeps: {
     exclude: ["@imgly/background-removal", "onnxruntime-web"],
   },
   ssr: {
-    noExternal: [],
-    external: ["@imgly/background-removal", "onnxruntime-web"],
-  },
-  build: {
-    rollupOptions: {
-      external: (id) =>
-        id === "onnxruntime-web/webgpu" ||
-        id === "onnxruntime-web/wasm" ||
-        id === "onnxruntime-web",
-    },
+    noExternal: ["@imgly/background-removal", "onnxruntime-web"],
   },
 });
