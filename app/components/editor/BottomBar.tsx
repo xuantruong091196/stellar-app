@@ -78,7 +78,7 @@ export function BottomBar({
           <span className="material-symbols-outlined text-sm">
             {isExtracting ? "hourglass_empty" : "auto_fix_high"}
           </span>
-          {isExtracting ? "Extracting…" : extractMode ? "Click image" : "Tách lớp"}
+          {isExtracting ? "Extracting…" : extractMode ? "Click image" : "Extract Layer"}
         </button>
       )}
 

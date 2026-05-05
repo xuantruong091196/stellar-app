@@ -134,7 +134,7 @@ export function AiToolsPanel({
       <div>
         <h3 className="text-sm font-bold mb-1">AI Tools</h3>
         <p className="text-[11px] text-on-surface-variant">
-          Tools không có ở chỗ khác. Generate ảnh từ trend ở Trend Suggestions. Upscale tự động khi publish.
+          Tools that don't live anywhere else. Generate from trends in Trend Suggestions. Upscale runs automatically on publish.
         </p>
       </div>
 
@@ -145,8 +145,8 @@ export function AiToolsPanel({
         </div>
         <p className="text-[11px] text-on-surface-variant">
           {hasImageSelected
-            ? "Image đã chọn. Click để remove background, output PNG transparent."
-            : "Chọn 1 ảnh trên canvas trước."}
+            ? "Image selected. Click to remove background and output a transparent PNG."
+            : "Select an image layer on the canvas first."}
         </p>
 
         {state === "processing" ? (
