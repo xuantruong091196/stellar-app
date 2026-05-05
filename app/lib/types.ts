@@ -57,15 +57,15 @@ export interface Design {
   mimeType: string;
   width: number | null;
   height: number | null;
-  copyrightTxHash: string | null;
-  copyrightLedger: number | null;
-  copyrightAt: string | null;
   createdAt: string;
   updatedAt: string;
   mockups?: Mockup[];
   provenance?: {
     status: 'MINTING' | 'MINTED' | 'MINT_FAILED' | 'BURNED';
     assetCode: string | null;
+    mintTxHash: string | null;
+    mintLedger: number | null;
+    createdAt: string;
   } | null;
 }
 

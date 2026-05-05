@@ -202,9 +202,9 @@ export default function UploadDesign() {
               SHA-256: {uploadedDesign.fileSha256}
             </p>
           )}
-          {uploadedDesign.copyrightTxHash && (
+          {uploadedDesign.provenance?.mintTxHash && (
             <p className="text-xs font-mono opacity-80">
-              TX: {uploadedDesign.copyrightTxHash}
+              TX: {uploadedDesign.provenance.mintTxHash}
             </p>
           )}
           <LinkButton to="/designs" variant="secondary" className="!mt-2">

@@ -64,8 +64,8 @@ export async function action({ request }: ActionFunctionArgs) {
 function copyrightStatus(
   design: Design,
 ): "registered" | "pending" | "unregistered" {
-  if (design.copyrightTxHash) return "registered";
-  if (design.copyrightAt) return "pending";
+  if (design.provenance?.mintTxHash) return "registered";
+  if (design.provenance?.status === "MINTING") return "pending";
   return "unregistered";
 }
 
@@ -110,7 +110,7 @@ export default function Designs() {
           <p className="text-sm text-on-surface-variant font-mono">
             {pagination?.total ?? designs.length} designs •{" "}
             <span className="text-green-400">
-              {designs.filter((d) => d.copyrightTxHash).length} protected
+              {designs.filter((d) => d.provenance?.mintTxHash).length} protected
             </span>
           </p>
 
@@ -159,13 +159,13 @@ export default function Designs() {
                         </span>
                       )}
                     </div>
-                    {d.copyrightTxHash && (
+                    {d.provenance?.mintTxHash && (
                       <div className="bg-surface-container-high px-2 py-1 rounded-lg">
                         <p className="text-[10px] text-on-surface-variant uppercase font-bold">
                           Tx Hash
                         </p>
                         <p className="text-[10px] font-mono text-primary truncate">
-                          {d.copyrightTxHash.slice(0, 20)}…
+                          {d.provenance.mintTxHash.slice(0, 20)}…
                         </p>
                       </div>
                     )}
