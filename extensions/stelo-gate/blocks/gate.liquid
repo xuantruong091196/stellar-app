@@ -1,0 +1,33 @@
+{% comment %}
+  Stelo Gate — renders only on PDP for products with stelo.gating_active = true
+{% endcomment %}
+{%- assign gating_active = product.metafields.stelo.gating_active -%}
+{%- if gating_active == true or gating_active == 'true' -%}
+<div id="stelo-gate"
+     data-product-id="{{ product.metafields.stelo.gated_product_id }}"
+     data-api-base="{{ block.settings.api_base }}">
+  <div class="stelo-gate__locked" hidden>
+    <p class="stelo-gate__msg">{{ 'stelo.locked_message' | t }}</p>
+    <button class="stelo-gate__connect" type="button">{{ 'stelo.connect_wallet' | t }}</button>
+  </div>
+  <div class="stelo-gate__verifying" hidden>{{ 'stelo.verifying' | t }}</div>
+  <div class="stelo-gate__failed" hidden>
+    <p class="stelo-gate__error"></p>
+  </div>
+  <div class="stelo-gate__passed" hidden>
+    <p>{{ 'stelo.verified' | t }} <span class="stelo-gate__wallet"></span></p>
+  </div>
+</div>
+<script src="{{ 'gate.js' | asset_url }}" defer></script>
+<link rel="stylesheet" href="{{ 'gate.css' | asset_url }}">
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Stelo Gate",
+  "target": "section",
+  "settings": [
+    { "type": "url", "id": "api_base", "label": "Stelo API Base", "default": "https://api.stelo.app" }
+  ]
+}
+{% endschema %}

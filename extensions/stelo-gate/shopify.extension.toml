@@ -1,0 +1,14 @@
+api_version = "2026-01"
+
+[[extensions]]
+type = "theme"
+name = "Stelo Gate"
+handle = "stelo-gate"
+
+  [[extensions.metafields]]
+  namespace = "stelo"
+  key = "gated_product_id"
+
+  [[extensions.metafields]]
+  namespace = "stelo"
+  key = "gating_active"

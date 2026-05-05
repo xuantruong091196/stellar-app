@@ -1,0 +1,22 @@
+#stelo-gate {
+  padding: 16px;
+  border-radius: 8px;
+  background: #f9fafb;
+  margin: 16px 0;
+  font-family: inherit;
+}
+.stelo-gate__connect {
+  background: #111827;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 0;
+  cursor: pointer;
+  font-size: 14px;
+}
+.stelo-gate__connect:hover { background: #1f2937; }
+.stelo-gate__failed { color: #b91c1c; }
+.stelo-gate__passed { color: #047857; }
+.stelo-gate__verifying { color: #6b7280; font-style: italic; }
+.stelo-gate__msg { margin: 0 0 8px; font-size: 14px; }
+.stelo-gate__error { margin: 0; font-size: 14px; }

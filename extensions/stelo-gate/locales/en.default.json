@@ -1,0 +1,8 @@
+{
+  "stelo": {
+    "locked_message": "This product is exclusive to NFT holders.",
+    "connect_wallet": "Connect Stellar Wallet",
+    "verifying": "Verifying your wallet…",
+    "verified": "Verified as"
+  }
+}
