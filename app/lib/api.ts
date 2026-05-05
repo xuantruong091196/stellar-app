@@ -147,3 +147,48 @@ export const apiPatch = <T>(
 
 export const apiDelete = <T>(endpoint: string, walletAddress?: string) =>
   api<T>(endpoint, { method: "DELETE", walletAddress });
+
+// ---------------------------------------------------------------------------
+// Public provenance endpoint — no auth required, safe to call from loaders
+// ---------------------------------------------------------------------------
+
+export interface ProvenanceRecord {
+  designId: string;
+  assetCode: string | null;
+  status: string;
+  storeName: string;
+  ownerWallet: string;
+  fileSha256: string;
+  registeredAt: string;
+  mintLedger: number | null;
+  stellarExplorerUrl: string | null;
+}
+
+/**
+ * Fetch provenance data for a design. Throws a Remix `Response` on 404 so
+ * the nearest `ErrorBoundary` / `CatchBoundary` can render a proper 404 page.
+ * Throws a plain `Error` for other non-OK responses.
+ *
+ * Intended for use inside Remix server-side loaders only.
+ */
+export async function getProvenancePublic(
+  designId: string,
+): Promise<ProvenanceRecord> {
+  const apiUrl =
+    process.env.STELLARPOD_API_URL ||
+    process.env.PUBLIC_API_URL ||
+    "http://localhost:8000";
+
+  const res = await fetch(
+    `${apiUrl}/provenance/${encodeURIComponent(designId)}`,
+  );
+
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Response("Design not found", { status: 404 });
+    }
+    throw new Error(`Provenance API error: ${res.status}`);
+  }
+
+  return res.json() as Promise<ProvenanceRecord>;
+}
