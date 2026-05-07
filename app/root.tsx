@@ -87,7 +87,8 @@ export default function App() {
     path.startsWith("/provider/") ||
     path.startsWith("/verify/") ||
     path.startsWith("/my-nfts") ||
-    path.startsWith("/provenance/");
+    path.startsWith("/provenance/") ||
+    path.startsWith("/marketplace");
 
   return (
     <html lang="en" className="dark">

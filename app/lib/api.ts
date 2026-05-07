@@ -315,6 +315,84 @@ export interface ProvenanceRecord {
  *
  * Intended for use inside Remix server-side loaders only.
  */
+// ---------------------------------------------------------------------------
+// Marketplace endpoints
+// ---------------------------------------------------------------------------
+
+export interface MarketplaceListing {
+  id: string;
+  nftTokenId: string;
+  sellerAddress: string;
+  priceUsdc: number;
+  status: string;
+  listedAt: string;
+  expiresAt: string | null;
+}
+
+export interface ListingsPage {
+  items: MarketplaceListing[];
+  nextCursor: string | null;
+}
+
+/**
+ * Fetch paginated marketplace listings. Server-side loader only — uses raw
+ * fetch against the internal API URL (same pattern as getProvenancePublic).
+ */
+export async function listMarketplaceListingsServer(
+  status: string = "ACTIVE",
+  cursor?: string,
+): Promise<ListingsPage> {
+  const apiUrl =
+    process.env.STELLARPOD_API_URL ||
+    process.env.PUBLIC_API_URL ||
+    "http://localhost:8000";
+
+  const params = new URLSearchParams({ status });
+  if (cursor) params.set("cursor", cursor);
+
+  const res = await fetch(`${apiUrl}/listings?${params.toString()}`);
+  if (!res.ok) {
+    return { items: [], nextCursor: null };
+  }
+  return res.json() as Promise<ListingsPage>;
+}
+
+/**
+ * Prepare a buy transaction for a listing. Returns a Soroban XDR (may be empty
+ * string while the backend is stubbed). Client-side call — no wallet auth
+ * needed at prepare stage; auth happens via signed XDR on confirm.
+ */
+export async function prepareListingBuy(
+  listingId: string,
+): Promise<{ xdr: string }> {
+  const res = await api<{ xdr: string }>(
+    `/listings/${encodeURIComponent(listingId)}/buy`,
+    { method: "POST" },
+  );
+  if (res.error) {
+    throw new Error(`prepareBuy failed: ${res.status} ${res.error}`);
+  }
+  return res.data!;
+}
+
+/**
+ * Submit the signed XDR to finalise the purchase.
+ * Returns the Stellar transaction hash on success.
+ */
+export async function confirmListingBuy(
+  listingId: string,
+  signedXdr: string,
+): Promise<{ txHash: string }> {
+  const res = await api<{ txHash: string }>(
+    `/listings/${encodeURIComponent(listingId)}/buy/confirm`,
+    { method: "POST", body: { signedXdr } },
+  );
+  if (res.error) {
+    throw new Error(`confirmBuy failed: ${res.status} ${res.error}`);
+  }
+  return res.data!;
+}
+
 export async function getProvenancePublic(
   designId: string,
 ): Promise<ProvenanceRecord> {
