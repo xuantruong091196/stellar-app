@@ -5,7 +5,8 @@
 {%- if gating_active == true or gating_active == 'true' -%}
 <div id="stelo-gate"
      data-product-id="{{ product.metafields.stelo.gated_product_id }}"
-     data-api-base="{{ block.settings.api_base }}">
+     data-api-base="{{ block.settings.api_base }}"
+     data-network="{{ block.settings.network }}">
   <div class="stelo-gate__locked" hidden>
     <p class="stelo-gate__msg">{{ 'stelo.locked_message' | t }}</p>
     <button class="stelo-gate__connect" type="button">{{ 'stelo.connect_wallet' | t }}</button>
@@ -27,7 +28,23 @@
   "name": "Stelo Gate",
   "target": "section",
   "settings": [
-    { "type": "url", "id": "api_base", "label": "Stelo API Base", "default": "https://api.stelo.app" }
+    {
+      "type": "url",
+      "id": "api_base",
+      "label": "Stelo API Base",
+      "default": "https://api.stelo.app"
+    },
+    {
+      "type": "select",
+      "id": "network",
+      "label": "Stellar Network",
+      "info": "Use 'testnet' for development stores; 'public' for production. Must match the network of the configured gating asset.",
+      "options": [
+        { "value": "public", "label": "Public (mainnet)" },
+        { "value": "testnet", "label": "Testnet" }
+      ],
+      "default": "public"
+    }
   ]
 }
 {% endschema %}

@@ -3,6 +3,13 @@
   if (!root) return;
   const productId = root.dataset.productId;
   const API = root.dataset.apiBase.replace(/\/$/, '');
+  // Network passphrase passed to Freighter when signing the SIWS challenge.
+  // Merchant configures this per storefront via the theme editor — testnet
+  // stores must select "testnet" or Freighter will refuse to sign.
+  const NETWORK_PASSPHRASE =
+    root.dataset.network === 'testnet'
+      ? 'Test SDF Network ; September 2015'
+      : 'Public Global Stellar Network ; September 2015';
 
   const $ = (sel) => root.querySelector(sel);
   const show = (el) => el && (el.hidden = false);
@@ -86,7 +93,7 @@
       // Freighter API: signMessage returns { signedMessage }; signature is hex-encoded raw bytes.
       // Verify against the actual Freighter SDK shape; this matches v3+ API.
       const sigResult = await window.freighterApi.signMessage(nonce, {
-        networkPassphrase: 'Public Global Stellar Network ; September 2015',
+        networkPassphrase: NETWORK_PASSPHRASE,
       });
       const signed = sigResult.signedMessage || sigResult.signedTxXdr || sigResult;
       await fetch(`${API}/gating/buyer-siws/verify`, {
