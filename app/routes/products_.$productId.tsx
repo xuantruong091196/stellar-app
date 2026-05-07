@@ -7,11 +7,12 @@ import type {
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useFetcher, useRevalidator, Link } from "@remix-run/react";
 
-import { apiGet, apiPost, apiPatch, apiDelete, getGatingServer } from "~/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete, getGatingServer, getRoyaltySplitsServer } from "~/lib/api";
 import { requireUser } from "~/lib/session.server";
-import type { MerchantProduct } from "~/lib/types";
+import type { MerchantProduct, RoyaltySplit } from "~/lib/types";
 import type { GatingData } from "~/lib/api";
 import { GatingForm } from "~/components/gating/GatingForm";
+import { SplitsEditor } from "~/components/royalties/SplitsEditor";
 import { pageMeta } from "~/lib/seo";
 import { AnimatedPage } from "~/components/ui/AnimatedPage";
 import { useConfirm } from "~/components/ui/ConfirmModal";
@@ -31,11 +32,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!productId)
     return json({ product: null, gating: null, error: "Missing product ID" });
 
-  const [res, gating] = await Promise.all([
+  const [res, gating, splits] = await Promise.all([
     apiGet<MerchantProduct>(`/products/${productId}`, walletAddress),
     getGatingServer(productId, walletAddress).catch(() => null),
+    getRoyaltySplitsServer("MERCHANT_PRODUCT", productId, walletAddress).catch(() => [] as RoyaltySplit[]),
   ]);
-  return json({ product: res.data ?? null, gating, error: res.error });
+  return json({ product: res.data ?? null, gating, splits, error: res.error });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -95,7 +97,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function ProductDetail() {
-  const { product, gating, error } = useLoaderData<typeof loader>();
+  const { product, gating, splits, error } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<{ error?: string; success?: boolean }>();
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -852,6 +854,24 @@ export default function ProductDetail() {
             <GatingForm
               productId={product.id}
               initial={gating as GatingData | null}
+              onSaved={() => revalidator.revalidate()}
+            />
+          </section>
+
+          {/* Royalty Splits */}
+          <section className="bg-surface-container-low rounded-xl p-6 space-y-4">
+            <div>
+              <h2 className="font-headline font-bold text-lg">Royalty Splits</h2>
+              <p className="text-xs text-on-surface-variant mt-1">
+                On order completion, escrow_v2 atomically distributes funds across
+                these wallets. Falls back to single-recipient v1 escrow if no splits
+                are configured.
+              </p>
+            </div>
+            <SplitsEditor
+              scopeType="MERCHANT_PRODUCT"
+              scopeId={product.id}
+              initial={splits ?? []}
               onSaved={() => revalidator.revalidate()}
             />
           </section>

@@ -332,3 +332,16 @@ export const ESCROW_STATUS_LABELS: Record<EscrowStatus, string> = {
   REFUNDED: 'Refunded',
   EXPIRED: 'Expired',
 };
+
+// ─── ROYALTY SPLITS ───────────────────────────
+
+export interface RoyaltySplit {
+  id: string;
+  scopeType: 'DESIGN' | 'MERCHANT_PRODUCT';
+  scopeId: string;
+  walletAddress: string;
+  percentBps: number;
+  role: string;
+  label: string | null;
+  verified: boolean;
+}

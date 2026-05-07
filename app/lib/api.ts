@@ -191,6 +191,99 @@ export async function getGatingServer(
 }
 
 // ---------------------------------------------------------------------------
+// Royalty Splits endpoints
+// ---------------------------------------------------------------------------
+
+import type { RoyaltySplit } from "~/lib/types";
+
+/**
+ * Fetch royalty splits for a scope (DESIGN or MERCHANT_PRODUCT).
+ * Returns [] when none configured (404 treated as "not set").
+ * Intended for Remix server-side loaders — uses walletAddress auth.
+ */
+export async function getRoyaltySplitsServer(
+  scopeType: "DESIGN" | "MERCHANT_PRODUCT",
+  scopeId: string,
+  walletAddress: string,
+): Promise<RoyaltySplit[]> {
+  const res = await apiGet<RoyaltySplit[]>(
+    `/royalty-splits?scopeType=${encodeURIComponent(scopeType)}&scopeId=${encodeURIComponent(scopeId)}`,
+    walletAddress,
+  );
+  if (res.status === 404) return [];
+  if (res.error) throw new Error(`getRoyaltySplits failed: ${res.error}`);
+  return res.data ?? [];
+}
+
+/**
+ * Create or replace royalty splits for a scope.
+ * Client-side call — routes through the Remix proxy so the wallet session
+ * cookie is used for auth (same pattern as GatingForm → api()).
+ */
+export async function upsertRoyaltySplits(payload: {
+  scopeType: "DESIGN" | "MERCHANT_PRODUCT";
+  scopeId: string;
+  splits: Array<{
+    walletAddress: string;
+    percentBps: number;
+    role: string;
+    label?: string;
+  }>;
+}): Promise<RoyaltySplit[]> {
+  const res = await apiPost<RoyaltySplit[]>(
+    "/royalty-splits",
+    payload,
+  );
+  if (res.error) throw new Error(`upsertRoyaltySplits failed: ${res.error}`);
+  return res.data ?? [];
+}
+
+/**
+ * Remove all royalty splits for a scope.
+ * Client-side call.
+ */
+export async function clearRoyaltySplits(
+  scopeType: "DESIGN" | "MERCHANT_PRODUCT",
+  scopeId: string,
+): Promise<void> {
+  const res = await apiDelete(
+    `/royalty-splits/${encodeURIComponent(scopeType)}/${encodeURIComponent(scopeId)}`,
+  );
+  if (res.error) throw new Error(`clearRoyaltySplits failed: ${res.error}`);
+}
+
+/**
+ * Request a nonce challenge for wallet-ownership verification of a split.
+ * Client-side call.
+ */
+export async function verifySplitChallenge(
+  splitId: string,
+): Promise<{ nonce: string; expiresAt: string }> {
+  const res = await apiPost<{ nonce: string; expiresAt: string }>(
+    `/royalty-splits/${encodeURIComponent(splitId)}/verify-challenge`,
+    {},
+  );
+  if (res.error) throw new Error(`verifySplitChallenge failed: ${res.error}`);
+  return res.data!;
+}
+
+/**
+ * Submit a signed nonce to confirm wallet ownership for a split.
+ * Client-side call.
+ */
+export async function confirmSplitChallenge(
+  splitId: string,
+  signedNonce: string,
+): Promise<{ verified: boolean }> {
+  const res = await apiPost<{ verified: boolean }>(
+    `/royalty-splits/${encodeURIComponent(splitId)}/verify-confirm`,
+    { signedNonce },
+  );
+  if (res.error) throw new Error(`confirmSplitChallenge failed: ${res.error}`);
+  return res.data!;
+}
+
+// ---------------------------------------------------------------------------
 // Public provenance endpoint — no auth required, safe to call from loaders
 // ---------------------------------------------------------------------------
 
