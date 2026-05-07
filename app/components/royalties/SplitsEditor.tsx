@@ -33,6 +33,7 @@ export function SplitsEditor({ scopeType, scopeId, initial, onSaved }: Props) {
   );
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [missingTrustlines, setMissingTrustlines] = useState<string[]>([]);
 
   const total = useMemo(
     () => splits.reduce((s, x) => s + (Number(x.percentBps) || 0), 0),
@@ -60,12 +61,13 @@ export function SplitsEditor({ scopeType, scopeId, initial, onSaved }: Props) {
     e.preventDefault();
     setSaving(true);
     setNote(null);
+    setMissingTrustlines([]);
     try {
       if (splits.length === 0) {
         await clearRoyaltySplits(scopeType, scopeId);
         setNote("Royalty splits removed");
       } else if (isValid) {
-        await upsertRoyaltySplits({
+        const result = await upsertRoyaltySplits({
           scopeType,
           scopeId,
           splits: splits.map(({ walletAddress, percentBps, role, label }) => ({
@@ -76,6 +78,7 @@ export function SplitsEditor({ scopeType, scopeId, initial, onSaved }: Props) {
           })),
         });
         setNote("Royalty splits saved");
+        setMissingTrustlines(result.missingTrustlines ?? []);
       }
       onSaved?.();
     } catch (err: unknown) {
@@ -214,6 +217,19 @@ export function SplitsEditor({ scopeType, scopeId, initial, onSaved }: Props) {
           </span>
         )}
       </div>
+
+      {missingTrustlines.length > 0 && (
+        <div className="mt-3 p-3 border border-amber-500/40 bg-amber-500/10 rounded text-sm">
+          <strong className="text-amber-400">Heads up:</strong> these wallets
+          haven&apos;t opened a USDC trustline yet. Until they do, orders for
+          this product will fall back to single-recipient v1 escrow:
+          <ul className="font-mono text-xs mt-1 space-y-0.5">
+            {missingTrustlines.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <p className="text-[10px] text-on-surface-variant pt-2 border-t border-outline-variant/10">
         <strong>Deferred:</strong> Wallet-ownership verification (challenge/sign flow via

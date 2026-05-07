@@ -215,10 +215,19 @@ export async function getRoyaltySplitsServer(
   return res.data ?? [];
 }
 
+export interface UpsertRoyaltySplitsResult {
+  splits: RoyaltySplit[];
+  missingTrustlines: string[];
+}
+
 /**
  * Create or replace royalty splits for a scope.
  * Client-side call — routes through the Remix proxy so the wallet session
  * cookie is used for auth (same pattern as GatingForm → api()).
+ *
+ * Returns `{ splits, missingTrustlines }`. When `missingTrustlines` is
+ * non-empty, the listed wallets haven't opened a USDC trustline yet; orders
+ * for this product will fall back to single-recipient v1 escrow until they do.
  */
 export async function upsertRoyaltySplits(payload: {
   scopeType: "DESIGN" | "MERCHANT_PRODUCT";
@@ -229,13 +238,13 @@ export async function upsertRoyaltySplits(payload: {
     role: string;
     label?: string;
   }>;
-}): Promise<RoyaltySplit[]> {
-  const res = await apiPost<RoyaltySplit[]>(
+}): Promise<UpsertRoyaltySplitsResult> {
+  const res = await apiPost<UpsertRoyaltySplitsResult>(
     "/royalty-splits",
     payload,
   );
   if (res.error) throw new Error(`upsertRoyaltySplits failed: ${res.error}`);
-  return res.data ?? [];
+  return res.data ?? { splits: [], missingTrustlines: [] };
 }
 
 /**
