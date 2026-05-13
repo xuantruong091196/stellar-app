@@ -333,6 +333,27 @@ export const ESCROW_STATUS_LABELS: Record<EscrowStatus, string> = {
   EXPIRED: 'Expired',
 };
 
+// ─── TREND INSIGHTS ───────────────────────────
+
+/**
+ * One ranked trend insight cell — (niche × styleTag × priceBand) for the
+ * current 7-day window. Returned by `GET /trends/insights`. Score is 0-100,
+ * decayed by age. `topEvidenceKeyword` is the human-readable label from the
+ * highest-engagement underlying trend item (e.g. "Minimalist Mama Tee").
+ */
+export interface TrendInsight {
+  id: string;
+  niche: string;
+  styleTag: string;
+  priceBandLow: number;
+  priceBandHigh: number;
+  score: number;
+  sources: Record<string, unknown>;
+  topEvidenceKeyword: string | null;
+  evidenceItemIds: string[];
+  windowStart: string;
+}
+
 // ─── ROYALTY SPLITS ───────────────────────────
 
 export interface RoyaltySplit {

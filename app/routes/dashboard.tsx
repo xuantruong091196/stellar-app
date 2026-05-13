@@ -9,6 +9,7 @@ import type {
   MerchantProduct,
   PaginatedResponse,
   Store,
+  TrendInsight,
 } from "~/lib/types";
 import { PageHeader, StatCard, SectionCard, EmptyState } from "~/components/ui/PageHeader";
 import { LinkButton } from "~/components/ui/Button";
@@ -17,6 +18,7 @@ import { pageMeta } from "~/lib/seo";
 import { AnimatedPage } from "~/components/ui/AnimatedPage";
 import { StaggerList, StaggerItem } from "~/components/ui/StaggerList";
 import { CountUp } from "~/components/ui/CountUp";
+import { TrendInsightsCard } from "~/components/dashboard/TrendInsightsCard";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -49,11 +51,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
-  const [ordersRes, escrowsRes, productsRes] = await Promise.all([
+  const [ordersRes, escrowsRes, productsRes, insightsRes] = await Promise.all([
     apiGet<PaginatedResponse<Order>>(`/orders/${deriveStoreId(walletAddress)}?limit=5`, walletAddress),
     apiGet<PaginatedResponse<Escrow>>(`/escrow/store/${deriveStoreId(walletAddress)}?limit=5`, walletAddress),
     apiGet<PaginatedResponse<MerchantProduct>>(
       `/products/store/${deriveStoreId(walletAddress)}?limit=100`,
+      walletAddress,
+    ),
+    // Trend insights: top 3 global for v1. Per-niche personalization is v2
+    // once we derive merchant niches from their published products.
+    // Errors silently → empty array (insights are a non-critical widget).
+    apiGet<{ data: TrendInsight[]; count: number }>(
+      `/trends/insights?limit=3`,
       walletAddress,
     ),
   ]);
@@ -61,6 +70,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const orders = ordersRes.data?.data ?? [];
   const escrows = escrowsRes.data?.data ?? [];
   const products = productsRes.data?.data ?? [];
+  const insights = insightsRes.data?.data ?? [];
 
   const orderSummary = {
     pending: orders.filter(
@@ -90,6 +100,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     activeProducts,
     totalRevenue,
     productsCount: products.length,
+    insights,
     error: ordersRes.error || escrowsRes.error || null,
   });
 }
@@ -102,6 +113,7 @@ export default function Dashboard() {
     totalOrders,
     activeProducts,
     totalRevenue,
+    insights,
     error,
   } = useLoaderData<typeof loader>();
 
@@ -264,6 +276,8 @@ export default function Dashboard() {
         </section>
 
         <section className="lg:col-span-4 space-y-8">
+          <TrendInsightsCard insights={insights} />
+
           <div className="bg-surface-container-low p-6 rounded-2xl">
             <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant mb-6">
               Quick Statistics
