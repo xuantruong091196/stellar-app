@@ -336,6 +336,23 @@ export const ESCROW_STATUS_LABELS: Record<EscrowStatus, string> = {
 // ─── TREND INSIGHTS ───────────────────────────
 
 /**
+ * Latest weekly snapshot from the eval-harness cron. Compares conversion
+ * (designs that resulted in ≥1 order) between insight-driven and control
+ * trend-designs. Returned by `GET /trends/insights/eval`. `conversionLift`
+ * is null when the control cohort had zero conversions (division undefined).
+ */
+export interface TrendInsightEvalSnapshot {
+  id: string;
+  snapshotAt: string;
+  lookbackDays: number;
+  insightDrivenDesigns: number;
+  insightDrivenOrders: number;
+  controlDesigns: number;
+  controlOrders: number;
+  conversionLift: number | null;
+}
+
+/**
  * One ranked trend insight cell — (niche × styleTag × priceBand) for the
  * current 7-day window. Returned by `GET /trends/insights`. Score is 0-100,
  * decayed by age. `topEvidenceKeyword` is the human-readable label from the

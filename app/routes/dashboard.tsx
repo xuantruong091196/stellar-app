@@ -10,6 +10,7 @@ import type {
   PaginatedResponse,
   Store,
   TrendInsight,
+  TrendInsightEvalSnapshot,
 } from "~/lib/types";
 import { PageHeader, StatCard, SectionCard, EmptyState } from "~/components/ui/PageHeader";
 import { LinkButton } from "~/components/ui/Button";
@@ -19,6 +20,7 @@ import { AnimatedPage } from "~/components/ui/AnimatedPage";
 import { StaggerList, StaggerItem } from "~/components/ui/StaggerList";
 import { CountUp } from "~/components/ui/CountUp";
 import { TrendInsightsCard } from "~/components/dashboard/TrendInsightsCard";
+import { EvalLiftPanel } from "~/components/dashboard/EvalLiftPanel";
 
 export const meta: MetaFunction = () =>
   pageMeta({
@@ -51,7 +53,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
-  const [ordersRes, escrowsRes, productsRes, insightsRes] = await Promise.all([
+  const [ordersRes, escrowsRes, productsRes, insightsRes, evalRes] = await Promise.all([
     apiGet<PaginatedResponse<Order>>(`/orders/${deriveStoreId(walletAddress)}?limit=5`, walletAddress),
     apiGet<PaginatedResponse<Escrow>>(`/escrow/store/${deriveStoreId(walletAddress)}?limit=5`, walletAddress),
     apiGet<PaginatedResponse<MerchantProduct>>(
@@ -65,12 +67,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
       `/trends/insights?limit=3`,
       walletAddress,
     ),
+    apiGet<{ data: TrendInsightEvalSnapshot | null }>(
+      `/trends/insights/eval`,
+      walletAddress,
+    ),
   ]);
 
   const orders = ordersRes.data?.data ?? [];
   const escrows = escrowsRes.data?.data ?? [];
   const products = productsRes.data?.data ?? [];
   const insights = insightsRes.data?.data ?? [];
+  const evalSnapshot = evalRes.data?.data ?? null;
 
   const orderSummary = {
     pending: orders.filter(
@@ -101,6 +108,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     totalRevenue,
     productsCount: products.length,
     insights,
+    evalSnapshot,
     error: ordersRes.error || escrowsRes.error || null,
   });
 }
@@ -114,6 +122,7 @@ export default function Dashboard() {
     activeProducts,
     totalRevenue,
     insights,
+    evalSnapshot,
     error,
   } = useLoaderData<typeof loader>();
 
@@ -277,6 +286,8 @@ export default function Dashboard() {
 
         <section className="lg:col-span-4 space-y-8">
           <TrendInsightsCard insights={insights} />
+
+          <EvalLiftPanel snapshot={evalSnapshot} />
 
           <div className="bg-surface-container-low p-6 rounded-2xl">
             <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant mb-6">
