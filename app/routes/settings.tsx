@@ -41,6 +41,7 @@ interface StoreSettings {
   shopifyConnected: boolean;
   walletAddress: string | null;
   stellarAddress: string | null;
+  shareOrderData: boolean;
 }
 
 export const meta: MetaFunction = () =>
@@ -92,6 +93,7 @@ export async function action({ request }: ActionFunctionArgs) {
       emailEnabled: formData.get("emailEnabled") === "on",
       inAppEnabled: formData.get("inAppEnabled") === "on",
       stellarAddress: (formData.get("stellarAddress") as string) || null,
+      shareOrderData: formData.get("shareOrderData") === "on",
     };
     const res = await apiPatch<StoreSettings>(
       `/settings/store/${storeId}`,
@@ -468,6 +470,30 @@ export default function Settings() {
               description="Webhook auto-disabled and other system events"
               checked={settings.notifySystem}
               onChange={(v) => updateField("notifySystem", v)}
+            />
+          </div>
+        </section>
+
+        {/* Trend Insights — internal moat signal opt-in */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div>
+            <h2 className="text-lg font-bold font-headline">Trend Insights</h2>
+            <p className="text-sm text-on-surface-variant mt-2">
+              Opt in to share aggregated order data with the trend insights
+              engine. Stelo never persists customer names, emails, or
+              addresses — only anonymized units sold per niche and price band.
+              Enabling this makes the "Trending in your niche" widget on your
+              dashboard significantly more accurate by mixing your sales
+              signal with social trends.
+            </p>
+          </div>
+          <div className="lg:col-span-2 bg-surface-container-low rounded-2xl p-6 space-y-4">
+            <Toggle
+              name="shareOrderData"
+              label="Contribute to trend insights"
+              description="Your aggregated sales (no PII) inform the insight scoring for everyone — opt in once 100+ stores share, the internal signal weight ramps up from 30% to 50%"
+              checked={settings.shareOrderData}
+              onChange={(v) => updateField("shareOrderData", v)}
             />
           </div>
         </section>
